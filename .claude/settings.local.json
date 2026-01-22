@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(tree:*)",
+      "Bash(go mod tidy:*)",
+      "Bash(npm install)",
+      "Bash(docker-compose up:*)",
+      "Bash(docker-compose down:*)",
+      "Bash(docker-compose build:*)",
+      "Bash(docker builder prune:*)",
+      "Bash(docker buildx build:*)",
+      "Bash(docker rmi:*)",
+      "Bash(docker pull:*)",
+      "Bash(docker build:*)",
+      "Bash(docker-compose ps:*)",
+      "Bash(curl:*)",
+      "Bash(docker logs:*)",
+      "Bash(docker exec:*)"
+    ]
+  }
+}
