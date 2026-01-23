@@ -4,3 +4,12 @@
 .env
 .env.local
 .env.*.local
+
+# Terraform
+*.tfvars
+*.tfvars.json
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.backup
+crash.log

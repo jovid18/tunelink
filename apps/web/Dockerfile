@@ -2,15 +2,15 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm ci
+COPY package.json yarn.lock* ./
+RUN yarn install --frozen-lockfile || yarn install
 
 COPY . .
 
 ARG VITE_API_URL=http://localhost:8080
 ENV VITE_API_URL=$VITE_API_URL
 
-RUN npm run build
+RUN yarn build
 
 FROM nginx:alpine
 
