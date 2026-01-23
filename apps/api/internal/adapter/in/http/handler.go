@@ -49,7 +49,7 @@ func (h *URLHandler) Redirect(c *gin.Context) {
 		return
 	}
 
-	c.Redirect(http.StatusMovedPermanently, originalURL)
+	c.Redirect(http.StatusFound, originalURL)
 }
 
 func Health(c *gin.Context) {
