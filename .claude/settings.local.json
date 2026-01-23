@@ -15,7 +15,14 @@
       "Bash(docker-compose ps:*)",
       "Bash(curl:*)",
       "Bash(docker logs:*)",
-      "Bash(docker exec:*)"
+      "Bash(docker exec:*)",
+      "Bash(go build:*)",
+      "Bash(go get:*)",
+      "Bash(ls:*)",
+      "Bash(docker compose:*)",
+      "Bash(pkill:*)",
+      "Bash(find:*)",
+      "Bash(docker ps:*)"
     ]
   }
 }

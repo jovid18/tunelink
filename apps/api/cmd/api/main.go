@@ -5,19 +5,25 @@ import (
 	"os"
 
 	"github.com/gin-gonic/gin"
-	"github.com/tunelink/api/internal/config"
-	"github.com/tunelink/api/internal/handler"
-	"github.com/tunelink/api/internal/repository"
-	"github.com/tunelink/api/internal/service"
+	httpAdapter "github.com/tunelink/api/internal/adapter/in/http"
+	redisAdapter "github.com/tunelink/api/internal/adapter/out/cache/redis"
+	mysqlAdapter "github.com/tunelink/api/internal/adapter/out/persistence/mysql"
+	urlApp "github.com/tunelink/api/internal/application/url"
+	"github.com/tunelink/api/internal/infrastructure"
 )
 
 func main() {
-	cfg := config.Load()
+	cfg := infrastructure.Load()
 
-	// Initialize dependencies
-	urlRepo := repository.NewURLRepository(cfg.DB)
-	urlService := service.NewURLService(urlRepo, cfg.Redis)
-	urlHandler := handler.NewURLHandler(urlService)
+	// Initialize adapters (outbound)
+	urlRepo := mysqlAdapter.NewURLRepository(cfg.DB)
+	urlCache := redisAdapter.NewURLCache(cfg.Redis)
+
+	// Initialize use cases (application)
+	urlUseCase := urlApp.NewURLUseCase(urlRepo, urlCache)
+
+	// Initialize handlers (inbound adapters)
+	urlHandler := httpAdapter.NewURLHandler(urlUseCase, cfg.BaseURL)
 
 	// Setup router
 	r := gin.Default()
@@ -35,7 +41,7 @@ func main() {
 	})
 
 	// Routes
-	r.GET("/health", handler.Health)
+	r.GET("/health", httpAdapter.Health)
 	r.POST("/api/urls", urlHandler.Create)
 	r.GET("/r/:shortUrl", urlHandler.Redirect)
 
