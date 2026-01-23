@@ -29,6 +29,20 @@ module "rds" {
   instance_class     = "db.t3.micro"  # 프리티어
 }
 
+# Bastion Host (for DB access)
+module "bastion" {
+  source = "../../modules/bastion"
+
+  project_name          = var.project_name
+  environment           = var.environment
+  vpc_id                = module.vpc.vpc_id
+  public_subnet_id      = module.vpc.public_subnet_ids[0]
+  key_name              = "tunelink-bastion"
+  rds_security_group_id = module.rds.security_group_id
+
+  depends_on = [module.rds]
+}
+
 # ElastiCache - SKIP (Redis 없이도 API 동작함)
 # module "elasticache" { ... }
 

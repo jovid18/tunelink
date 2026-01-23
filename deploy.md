@@ -421,6 +421,57 @@ aws elasticache describe-cache-clusters --query 'CacheClusters[*].[CacheClusterI
 
 ---
 
+#### 4.4.1 Bastion Host 모듈
+
+**목적:** Private RDS 접근용 SSH 터널링 서버
+
+- [x] `infra/terraform/modules/bastion/main.tf` 작성
+- [x] `infra/terraform/modules/bastion/variables.tf` 작성
+- [x] `infra/terraform/modules/bastion/outputs.tf` 작성
+- [x] EC2 Key Pair 생성 (`tunelink-bastion`)
+- [x] dev 환경에서 Bastion 모듈 호출 추가
+- [x] `terraform apply` 로 Bastion 생성 확인
+
+**Bastion 설정:**
+```
+Instance Type: t4g.micro (ARM, 프리티어)
+AMI: Amazon Linux 2023
+Subnet: Public Subnet
+Key Pair: tunelink-bastion
+```
+
+**접속 정보:**
+```
+Host: 3.36.60.248
+User: ec2-user
+Key: ~/.ssh/tunelink-bastion.pem
+```
+
+**DataGrip에서 RDS 접속 (SSH Tunnel):**
+```
+[SSH/SSL 탭]
+✅ Use SSH tunnel
+Host: 3.36.60.248
+Port: 22
+User: ec2-user
+Auth type: Key pair
+Private key: ~/.ssh/tunelink-bastion.pem
+
+[General 탭]
+Host: tunelink-dev-mysql.cxm4yimyycnl.ap-northeast-2.rds.amazonaws.com
+Port: 3306
+User: tunelink_admin
+Password: (terraform.tfvars 참고)
+Database: tunelink
+```
+
+**SSH 접속 테스트:**
+```bash
+ssh -i ~/.ssh/tunelink-bastion.pem ec2-user@3.36.60.248
+```
+
+---
+
 #### 4.5 EKS 모듈
 
 **목적:** Kubernetes 클러스터 생성
@@ -872,4 +923,8 @@ kubectl run -it --rm mysql-client --image=mysql:8 -n tunelink -- mysql -h {RDS_E
   - GitHub Secrets 설정 (AWS credentials)
   - `.github/workflows/api.yml` - API 빌드/배포
   - `.github/workflows/web.yml` - Web 빌드/배포
-  - `.github/workflows/infra.yml` - Terraform plan/apply
+  - ~~`.github/workflows/infra.yml`~~ - 삭제 (로컬에서 관리)
+- [x] Bastion Host 추가
+  - EC2 Key Pair 생성: tunelink-bastion
+  - Bastion EC2: 3.36.60.248
+  - DataGrip SSH Tunnel로 RDS 접속 가능

@@ -47,3 +47,14 @@ output "alb_dns_name" {
   description = "ALB DNS name"
   value       = module.k8s_web.alb_dns_name
 }
+
+# Bastion Outputs
+output "bastion_public_ip" {
+  description = "Bastion host public IP"
+  value       = module.bastion.public_ip
+}
+
+output "bastion_public_dns" {
+  description = "Bastion host public DNS"
+  value       = module.bastion.public_dns
+}
