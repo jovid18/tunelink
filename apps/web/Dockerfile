@@ -7,7 +7,8 @@ RUN yarn install --frozen-lockfile || yarn install
 
 COPY . .
 
-ARG VITE_API_URL=http://localhost:8080
+# Empty default = use relative paths (Ingress routes /api to API service)
+ARG VITE_API_URL=
 ENV VITE_API_URL=$VITE_API_URL
 
 RUN yarn build

@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import './App.css'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+// Production: use relative path (Ingress routes /api to API service)
+// Development: use VITE_API_URL if set, otherwise relative path
+const API_URL = import.meta.env.VITE_API_URL || ''
 
 function App() {
   const [url, setUrl] = useState('')
