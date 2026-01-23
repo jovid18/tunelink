@@ -19,7 +19,7 @@ terraform {
 
 provider "aws" {
   region  = var.aws_region
-  profile = var.aws_profile
+  profile = var.aws_profile != "" ? var.aws_profile : null
 
   default_tags {
     tags = {
@@ -37,7 +37,7 @@ provider "kubernetes" {
   exec {
     api_version = "client.authentication.k8s.io/v1beta1"
     command     = "aws"
-    args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name, "--profile", var.aws_profile]
+    args        = var.aws_profile != "" ? ["eks", "get-token", "--cluster-name", module.eks.cluster_name, "--profile", var.aws_profile] : ["eks", "get-token", "--cluster-name", module.eks.cluster_name]
   }
 }
 
@@ -49,7 +49,7 @@ provider "helm" {
     exec {
       api_version = "client.authentication.k8s.io/v1beta1"
       command     = "aws"
-      args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name, "--profile", var.aws_profile]
+      args        = var.aws_profile != "" ? ["eks", "get-token", "--cluster-name", module.eks.cluster_name, "--profile", var.aws_profile] : ["eks", "get-token", "--cluster-name", module.eks.cluster_name]
     }
   }
 }

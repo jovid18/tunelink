@@ -13,6 +13,7 @@ on:
 env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
   TF_WORKING_DIR: infra/terraform/envs/dev
+  TF_VAR_aws_profile: ""
 
 jobs:
   terraform-plan:
