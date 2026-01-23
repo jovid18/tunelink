@@ -13,3 +13,4 @@
 *.tfstate
 *.tfstate.backup
 crash.log
+.envrc

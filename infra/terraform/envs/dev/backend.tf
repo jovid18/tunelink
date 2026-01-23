@@ -5,6 +5,5 @@ terraform {
     region         = "ap-northeast-2"
     dynamodb_table = "tunelink-terraform-lock"
     encrypt        = true
-    profile        = "tunelink"
   }
 }
