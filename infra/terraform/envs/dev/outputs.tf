@@ -58,3 +58,19 @@ output "bastion_public_dns" {
   description = "Bastion host public DNS"
   value       = module.bastion.public_dns
 }
+
+# Monitoring Outputs
+output "grafana_url" {
+  description = "Grafana URL"
+  value       = module.monitoring.grafana_url
+}
+
+output "grafana_alb_dns" {
+  description = "Grafana ALB DNS (for Route53 CNAME)"
+  value       = module.monitoring.grafana_alb_dns
+}
+
+output "prometheus_port_forward" {
+  description = "Command to access Prometheus"
+  value       = module.monitoring.prometheus_port_forward_command
+}

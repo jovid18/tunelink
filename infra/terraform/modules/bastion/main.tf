@@ -63,6 +63,10 @@ resource "aws_instance" "bastion" {
   tags = {
     Name = "${local.name_prefix}-bastion"
   }
+
+  lifecycle {
+    ignore_changes = [ami]
+  }
 }
 
 # Allow Bastion to access RDS

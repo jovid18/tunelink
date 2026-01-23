@@ -58,9 +58,9 @@ module "eks" {
   kubernetes_version  = "1.29"
   node_instance_types = ["t3.small", "t3.medium", "t3a.small", "t3a.medium"]
   node_capacity_type  = "SPOT"
-  node_desired_size   = 2
-  node_min_size       = 1
-  node_max_size       = 3
+  node_desired_size   = 3
+  node_min_size       = 2
+  node_max_size       = 4
 }
 
 # AWS Load Balancer Controller
@@ -130,4 +130,33 @@ module "k8s_web" {
   certificate_arn  = var.certificate_arn
 
   depends_on = [module.k8s_api]
+}
+
+# Monitoring (Prometheus + Grafana)
+module "monitoring" {
+  source = "../../modules/monitoring"
+
+  project_name           = var.project_name
+  environment            = var.environment
+  grafana_admin_password = var.grafana_admin_password
+
+  # Prod 설정
+  prometheus_retention      = "15d"
+  prometheus_memory_request = "512Mi"
+  prometheus_memory_limit   = "1Gi"
+  grafana_memory_request    = "256Mi"
+  grafana_memory_limit      = "512Mi"
+
+  # Persistence 비활성화 (EBS CSI Driver 설치 후 활성화)
+  enable_persistence = false
+
+  # Ingress 설정
+  ingress_enabled = true
+  grafana_host    = "grafana.${var.domain_name}"
+  certificate_arn = var.certificate_arn
+
+  # AlertManager 활성화
+  alertmanager_enabled = true
+
+  depends_on = [module.eks]
 }

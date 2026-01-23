@@ -73,3 +73,10 @@ variable "certificate_arn" {
   type        = string
   default     = "arn:aws:acm:ap-northeast-2:058264445568:certificate/d2dd8141-7efd-4aed-bd94-c39402abd721"
 }
+
+# Monitoring
+variable "grafana_admin_password" {
+  description = "Grafana admin password"
+  type        = string
+  sensitive   = true
+}
