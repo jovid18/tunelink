@@ -55,7 +55,7 @@ module "eks" {
   vpc_id             = module.vpc.vpc_id
   private_subnet_ids = module.vpc.private_subnet_ids
 
-  kubernetes_version  = "1.29"
+  kubernetes_version  = "1.32"
   node_instance_types = ["t3.small", "t3.medium", "t3a.small", "t3a.medium"]
   node_capacity_type  = "SPOT"
   node_desired_size   = 3
