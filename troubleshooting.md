@@ -100,3 +100,98 @@ terraform plan
 **참고:**
 - Security Group Rule의 import ID 형식: `{sg_id}_{type}_{protocol}_{from_port}_{to_port}_{source}`
 - source가 CIDR이면 그대로, Security Group이면 해당 SG ID 사용
+
+---
+
+## Helm
+
+### k6-operator Helm 설치 시 Namespace 충돌
+
+**날짜:** 2025-01-25
+
+**증상:**
+- `terraform apply` 시 다양한 namespace 관련 에러 발생
+```
+Error: namespaces "k6-operator-system" already exists
+Error: no Namespace with the name "k6-operator-system" found
+Error: invalid ownership metadata; label validation error: missing key "app.kubernetes.io/managed-by": must be set to "Helm"
+```
+
+**원인:**
+- Terraform의 `kubernetes_namespace`와 Helm의 `create_namespace`가 충돌
+- Helm은 자신이 관리하는 namespace에 특정 레이블/어노테이션이 있어야 함
+- `helm uninstall` 시 namespace도 함께 삭제되어 상태 불일치 발생
+
+**시도했던 방법들 (실패):**
+
+1. **Helm만 사용 (`create_namespace = true`)**
+   - namespace가 이미 있으면: `already exists` 에러
+   - namespace가 없으면: 성공하지만, 다른 이유로 실패 시 상태 꼬임
+
+2. **Terraform namespace + Helm (`create_namespace = false`)**
+   - Helm이 namespace ownership 검사에서 실패
+   - `invalid ownership metadata` 에러
+
+3. **kubectl로 namespace 생성 후 Helm 설치**
+   - Helm chart 자체가 namespace를 생성하려고 해서 충돌
+
+**해결 방법:**
+- Terraform으로 namespace 생성하되, **Helm이 인식할 수 있는 레이블/어노테이션 추가**
+- Helm chart의 namespace 생성 옵션도 비활성화
+
+```hcl
+# 1. Namespace에 Helm 레이블/어노테이션 추가
+resource "kubernetes_namespace" "k6_operator" {
+  metadata {
+    name = "k6-operator-system"
+
+    labels = {
+      "app.kubernetes.io/managed-by" = "Helm"
+    }
+
+    annotations = {
+      "meta.helm.sh/release-name"      = "k6-operator"
+      "meta.helm.sh/release-namespace" = "k6-operator-system"
+    }
+  }
+}
+
+# 2. Helm release 설정
+resource "helm_release" "k6_operator" {
+  name             = "k6-operator"
+  repository       = "https://grafana.github.io/helm-charts"
+  chart            = "k6-operator"
+  namespace        = kubernetes_namespace.k6_operator.metadata[0].name
+  version          = "4.2.0"
+  create_namespace = false  # Terraform이 이미 생성함
+
+  # Helm chart의 namespace 생성도 비활성화
+  set {
+    name  = "namespace.create"
+    value = "false"
+  }
+
+  depends_on = [kubernetes_namespace.k6_operator]
+}
+```
+
+**상태가 꼬였을 때 정리 방법:**
+```bash
+# 1. Helm release 삭제
+helm uninstall k6-operator -n k6-operator-system
+
+# 2. Namespace 삭제
+kubectl delete ns k6-operator-system
+
+# 3. Terraform state에서 제거
+terraform state rm module.k6_operator.helm_release.k6_operator
+terraform state rm module.k6_operator.kubernetes_namespace.k6_operator
+
+# 4. 다시 apply
+terraform apply
+```
+
+**핵심 포인트:**
+- Helm은 자신이 관리하는 리소스에 `app.kubernetes.io/managed-by=Helm` 레이블 필요
+- `meta.helm.sh/release-name`, `meta.helm.sh/release-namespace` 어노테이션도 필요
+- 여러 도구가 같은 리소스를 관리하려 할 때 ownership 충돌 주의

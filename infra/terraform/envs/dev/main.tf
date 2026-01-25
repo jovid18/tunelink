@@ -160,3 +160,13 @@ module "monitoring" {
 
   depends_on = [module.eks]
 }
+
+# k6-operator (Load Testing)
+module "k6_operator" {
+  source = "../../modules/k6_operator"
+
+  environment   = var.environment
+  app_namespace = module.k8s_base.namespace
+
+  depends_on = [module.eks, module.k8s_base]
+}

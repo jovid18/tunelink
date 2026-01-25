@@ -709,6 +709,119 @@ echo | openssl s_client -servername hearttune.link -connect hearttune.link:443 2
 
 ---
 
+#### 4.11 k6-operator 모듈 (부하테스트)
+
+**목적:** Kubernetes-native 부하테스트 환경 구축
+
+> **선정 이유** (`test.md` 참고)
+> - 업계 표준 부하테스트 도구
+> - Grafana 연동 최적화 (같은 회사 제품)
+> - K8s CRD로 테스트 정의 → GitOps 친화적
+
+- [ ] `infra/terraform/modules/k6_operator/main.tf` 작성
+- [ ] `infra/terraform/modules/k6_operator/variables.tf` 작성
+- [ ] `infra/terraform/modules/k6_operator/outputs.tf` 작성
+- [ ] dev 환경에서 k6-operator 모듈 호출 추가
+- [ ] `terraform apply` 로 설치 확인
+
+**k6-operator 설정:**
+```
+Namespace: k6-operator-system
+CRD: TestRun (k6 테스트 실행 단위)
+Helm Chart: grafana/k6-operator
+```
+
+**아키텍처:**
+```
+┌─────────────────────────────────────────────────────────┐
+│                    EKS Cluster                          │
+│                                                         │
+│  ┌─────────────────┐     ┌─────────────────────────┐   │
+│  │  k6-operator    │     │     tunelink namespace   │   │
+│  │  (controller)   │     │  ┌─────┐    ┌─────┐     │   │
+│  └────────┬────────┘     │  │ API │    │ Web │     │   │
+│           │              │  └──▲──┘    └──▲──┘     │   │
+│           │ creates      │     │          │        │   │
+│           ▼              │     │          │        │   │
+│  ┌─────────────────┐     │     │          │        │   │
+│  │   TestRun CRD   │─────┼─────┴──────────┘        │   │
+│  │  (k6 스크립트)  │     │   HTTP requests         │   │
+│  └─────────────────┘     └─────────────────────────┘   │
+│           │                                             │
+│           ▼                                             │
+│  ┌─────────────────┐                                   │
+│  │   k6 Runner     │──────► Prometheus (메트릭 수집)   │
+│  │   Pods (1~N)    │──────► Grafana (대시보드)         │
+│  └─────────────────┘                                   │
+└─────────────────────────────────────────────────────────┘
+```
+
+**apply 후 확인:**
+```bash
+# k6-operator 설치 확인
+kubectl get deployment -n k6-operator-system
+
+# CRD 확인
+kubectl get crd | grep k6
+
+# 샘플 테스트 실행
+kubectl apply -f - <<EOF
+apiVersion: k6.io/v1alpha1
+kind: TestRun
+metadata:
+  name: smoke-test
+  namespace: tunelink
+spec:
+  parallelism: 2
+  script:
+    configMap:
+      name: k6-test-script
+      file: script.js
+EOF
+
+# 테스트 상태 확인
+kubectl get testrun -n tunelink
+kubectl logs -n tunelink -l app=k6 -f
+```
+
+**k6 테스트 스크립트 예시 (ConfigMap):**
+```javascript
+// script.js
+import http from 'k6/http';
+import { check, sleep } from 'k6';
+
+export const options = {
+  stages: [
+    { duration: '30s', target: 20 },   // ramp up
+    { duration: '1m', target: 20 },    // stay
+    { duration: '30s', target: 0 },    // ramp down
+  ],
+};
+
+export default function () {
+  // Health check
+  let res = http.get('http://api.tunelink.svc.cluster.local/health');
+  check(res, { 'health ok': (r) => r.status === 200 });
+
+  // URL 단축 생성
+  res = http.post(
+    'http://api.tunelink.svc.cluster.local/api/urls',
+    JSON.stringify({ original_url: 'https://example.com/test' }),
+    { headers: { 'Content-Type': 'application/json' } }
+  );
+  check(res, { 'create ok': (r) => r.status === 200 || r.status === 201 });
+
+  sleep(1);
+}
+```
+
+**Grafana 연동 (기존 모니터링 스택 활용):**
+- k6는 Prometheus Remote Write 지원
+- 기존 `prometheus-grafana`에 k6 대시보드 추가 가능
+- Dashboard ID: `2587` (k6 Load Testing Results)
+
+---
+
 ### Step 5: 전체 배포 테스트
 
 - [ ] 커스텀 도메인 접속 확인: `https://hearttune.link`
