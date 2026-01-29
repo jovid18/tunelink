@@ -188,18 +188,46 @@ kubectl delete testrun stress-test -n tunelink
 
 ---
 
-## Grafana 연동 (선택)
+## Grafana 연동
 
-k6는 Prometheus Remote Write를 지원하여 기존 모니터링 스택과 연동 가능.
+k6는 Prometheus Remote Write를 지원하여 기존 모니터링 스택과 연동됨.
 
-**Grafana k6 Dashboard ID**: `2587`
+### 아키텍처
+```
+k6 Runner Pod → Prometheus Remote Write → Prometheus → Grafana
+```
 
+### 설정 (이미 적용됨)
+
+**1. Prometheus Remote Write Receiver 활성화**
+```hcl
+# monitoring 모듈 main.tf
+prometheus.prometheusSpec.enableRemoteWriteReceiver = true
+```
+
+**2. k6 TestRun에서 Prometheus로 메트릭 전송**
+```yaml
+# testruns/*.yaml
+spec:
+  arguments: --out experimental-prometheus-rw
+  runner:
+    env:
+      - name: K6_PROMETHEUS_RW_SERVER_URL
+        value: http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090/api/v1/write
+```
+
+**3. Grafana k6 대시보드 자동 프로비저닝**
+- **Dashboard ID**: 19665 (k6 Prometheus)
+- **폴더**: "k6 Load Testing"
+- terraform apply 시 자동 설치됨
+
+### 수동 대시보드 Import (필요시)
 ```bash
 # Grafana 접속 (port-forward)
 kubectl port-forward svc/prometheus-grafana -n monitoring 3000:80
 
 # 브라우저에서 http://localhost:3000 접속
-# Dashboard > Import > ID: 2587
+# Dashboard > Import > ID: 19665
 ```
 
 ---
@@ -209,8 +237,20 @@ kubectl port-forward svc/prometheus-grafana -n monitoring 3000:80
 - [x] k6 도구 선정 및 근거 문서화
 - [x] k6-operator Terraform 모듈 작성
 - [x] API 엔드포인트별 테스트 스크립트 작성
-- [ ] k6-operator 배포 (terraform apply)
-- [ ] Smoke Test 실행 및 결과 확인
+- [x] k6-operator 배포 (terraform apply)
+- [x] Smoke Test 실행 및 결과 확인
 - [ ] Load Test 실행 및 결과 확인
-- [ ] Grafana 대시보드 연동
+- [x] Grafana 대시보드 연동 (Dashboard ID: 19665)
 - [ ] 부하테스트 결과 문서화
+
+### Smoke Test 결과 (2026-01-29)
+
+| 항목 | 결과 |
+|------|------|
+| VUs | 5 |
+| Duration | 30s |
+| Total Requests | 150 |
+| Success Rate | 100% |
+| p(95) Latency | 1.81ms |
+| Error Rate | 0.00% |
+| Threshold | 모두 통과 |

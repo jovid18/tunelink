@@ -104,6 +104,8 @@ resource "helm_release" "prometheus_stack" {
     yamlencode({
       prometheus = {
         prometheusSpec = {
+          # k6에서 Remote Write로 메트릭을 받기 위해 활성화
+          enableRemoteWriteReceiver = true
           storageSpec = var.enable_persistence ? {
             volumeClaimTemplate = {
               spec = {
@@ -122,6 +124,34 @@ resource "helm_release" "prometheus_stack" {
         persistence = {
           enabled = var.enable_persistence
           size    = var.grafana_storage_size
+        }
+        # 기본 대시보드 유지
+        defaultDashboardsEnabled = true
+        # k6 대시보드 프로비저닝
+        dashboardProviders = {
+          "dashboardproviders.yaml" = {
+            apiVersion = 1
+            providers = [{
+              name            = "k6"
+              orgId           = 1
+              folder          = "k6 Load Testing"
+              type            = "file"
+              disableDeletion = false
+              editable        = true
+              options = {
+                path = "/var/lib/grafana/dashboards/k6"
+              }
+            }]
+          }
+        }
+        dashboards = {
+          k6 = {
+            k6-prometheus = {
+              gnetId     = 19665
+              revision   = 1
+              datasource = "Prometheus"
+            }
+          }
         }
       }
     })

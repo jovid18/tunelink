@@ -330,6 +330,21 @@ aws route53 change-resource-record-sets \
 | Kubernetes / Compute Resources / Node | 노드별 CPU/메모리 |
 | Kubernetes / Compute Resources / Pod | Pod별 리소스 |
 | Node Exporter / Nodes | EC2 노드 상세 (CPU, 디스크, 네트워크) |
+| k6 Load Testing / k6-prometheus (ID: 19665) | k6 부하테스트 결과 시각화 |
+
+### k6 부하테스트 연동 (2026-01-29 추가)
+
+k6 테스트 결과를 Grafana에서 시각화하기 위한 설정이 완료됨.
+
+**아키텍처**
+```
+k6 Runner Pod → Prometheus Remote Write → Prometheus → Grafana
+```
+
+**설정 내용**
+1. Prometheus: `enableRemoteWriteReceiver = true`
+2. k6 TestRun: `--out experimental-prometheus-rw` 옵션으로 메트릭 전송
+3. Grafana: Dashboard ID 19665 자동 프로비저닝 ("k6 Load Testing" 폴더)
 
 ---
 
@@ -340,5 +355,6 @@ aws route53 change-resource-record-sets \
 3. [x] Grafana Ingress 생성 (ALB)
 4. [x] Route53 DNS 등록 (grafana.hearttune.link)
 5. [x] Grafana 접속 확인
-6. [ ] (선택) 애플리케이션 메트릭 endpoint 추가 (/metrics)
-7. [ ] (선택) Slack/Discord 알람 연동
+6. [x] k6 부하테스트 대시보드 연동 (Dashboard ID: 19665)
+7. [ ] (선택) 애플리케이션 메트릭 endpoint 추가 (/metrics)
+8. [ ] (선택) Slack/Discord 알람 연동
