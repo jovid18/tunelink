@@ -28,30 +28,35 @@ func NewURLUseCase(repo url.Repository, cache url.Cache) UseCase {
 }
 
 func (uc *urlUseCase) CreateShortURL(ctx context.Context, cmd CreateURLCommand) (*CreateURLResult, error) {
-	shortURL, err := uc.generateUniqueShortURL(ctx)
-	if err != nil {
-		return nil, err
+	const maxRetries = 10
+
+	for i := 0; i < maxRetries; i++ {
+		shortURL := generateRandomString(shortURLLength)
+		entity := url.NewURL(shortURL, cmd.OriginalURL)
+
+		err := uc.repo.Save(ctx, entity)
+		if err == nil {
+			// Success - cache and return
+			_ = uc.cache.Set(ctx, shortURL, cmd.OriginalURL)
+			return &CreateURLResult{
+				ShortURL:    shortURL,
+				OriginalURL: cmd.OriginalURL,
+			}, nil
+		}
+
+		// Retry only on duplicate key error
+		if err != url.ErrDuplicateKey {
+			return nil, err
+		}
 	}
 
-	entity := url.NewURL(shortURL, cmd.OriginalURL)
-
-	if err := uc.repo.Save(ctx, entity); err != nil {
-		return nil, err
-	}
-
-	// Cache the URL
-	_ = uc.cache.Set(ctx, shortURL, cmd.OriginalURL)
-
-	return &CreateURLResult{
-		ShortURL:    shortURL,
-		OriginalURL: cmd.OriginalURL,
-	}, nil
+	return nil, ErrFailedToGenerateShortURL
 }
 
 func (uc *urlUseCase) ResolveShortURL(ctx context.Context, shortURL string) (string, error) {
 	// Try cache first
 	if originalURL, err := uc.cache.Get(ctx, shortURL); err == nil {
-		go uc.repo.IncrementClicks(context.Background(), shortURL)
+		go uc.incrementClicks(shortURL)
 		return originalURL, nil
 	}
 
@@ -64,24 +69,21 @@ func (uc *urlUseCase) ResolveShortURL(ctx context.Context, shortURL string) (str
 	// Update cache
 	_ = uc.cache.Set(ctx, shortURL, entity.OriginalURL)
 
-	// Increment clicks
-	go uc.repo.IncrementClicks(context.Background(), shortURL)
+	// Increment clicks using domain method
+	entity.IncrementClicks()
+	go uc.repo.Update(context.Background(), entity)
 
 	return entity.OriginalURL, nil
 }
 
-func (uc *urlUseCase) generateUniqueShortURL(ctx context.Context) (string, error) {
-	for i := 0; i < 10; i++ {
-		shortURL := generateRandomString(shortURLLength)
-		exists, err := uc.repo.ExistsByShortURL(ctx, shortURL)
-		if err != nil {
-			return "", err
-		}
-		if !exists {
-			return shortURL, nil
-		}
+func (uc *urlUseCase) incrementClicks(shortURL string) {
+	ctx := context.Background()
+	entity, err := uc.repo.FindByShortURL(ctx, shortURL)
+	if err != nil {
+		return
 	}
-	return "", ErrFailedToGenerateShortURL
+	entity.IncrementClicks()
+	uc.repo.Update(ctx, entity)
 }
 
 func generateRandomString(length int) string {

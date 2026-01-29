@@ -2,6 +2,7 @@ package http
 
 import (
 	"net/http"
+	"net/url"
 
 	"github.com/gin-gonic/gin"
 	urlapp "github.com/tunelink/api/internal/application/url"
@@ -23,6 +24,13 @@ func (h *URLHandler) Create(c *gin.Context) {
 	var req CreateURLRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid request"})
+		return
+	}
+
+	// URL 유효성 검사: http/https만 허용
+	u, err := url.Parse(req.OriginalURL)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
+		c.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid URL: must be http or https"})
 		return
 	}
 
