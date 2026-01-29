@@ -12,5 +12,7 @@
 .terraform.lock.hcl
 *.tfstate
 *.tfstate.backup
+*.tfplan
+*.out
 crash.log
 .envrc
