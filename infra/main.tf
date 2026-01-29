@@ -1,6 +1,6 @@
 # VPC
 module "vpc" {
-  source = "../../modules/vpc"
+  source = "./modules/vpc"
 
   project_name = var.project_name
   environment  = var.environment
@@ -10,7 +10,7 @@ module "vpc" {
 
 # ECR
 module "ecr" {
-  source = "../../modules/ecr"
+  source = "./modules/ecr"
 
   project_name = var.project_name
   environment  = var.environment
@@ -18,7 +18,7 @@ module "ecr" {
 
 # RDS (MySQL)
 module "rds" {
-  source = "../../modules/rds"
+  source = "./modules/rds"
 
   project_name       = var.project_name
   environment        = var.environment
@@ -31,7 +31,7 @@ module "rds" {
 
 # Bastion Host (for DB access)
 module "bastion" {
-  source = "../../modules/bastion"
+  source = "./modules/bastion"
 
   project_name          = var.project_name
   environment           = var.environment
@@ -48,7 +48,7 @@ module "bastion" {
 
 # EKS
 module "eks" {
-  source = "../../modules/eks"
+  source = "./modules/eks"
 
   project_name       = var.project_name
   environment        = var.environment
@@ -65,7 +65,7 @@ module "eks" {
 
 # AWS Load Balancer Controller
 module "alb_controller" {
-  source = "../../modules/alb_controller"
+  source = "./modules/alb_controller"
 
   project_name      = var.project_name
   environment       = var.environment
@@ -79,7 +79,7 @@ module "alb_controller" {
 
 # Kubernetes Base (Namespace, ConfigMap, Secret)
 module "k8s_base" {
-  source = "../../modules/k8s_base"
+  source = "./modules/k8s_base"
 
   project_name = var.project_name
   environment  = var.environment
@@ -100,7 +100,7 @@ module "k8s_base" {
 
 # Kubernetes API Deployment
 module "k8s_api" {
-  source = "../../modules/k8s_api"
+  source = "./modules/k8s_api"
 
   project_name     = var.project_name
   environment      = var.environment
@@ -117,7 +117,7 @@ module "k8s_api" {
 
 # Kubernetes Web Deployment + Ingress
 module "k8s_web" {
-  source = "../../modules/k8s_web"
+  source = "./modules/k8s_web"
 
   project_name     = var.project_name
   environment      = var.environment
@@ -134,7 +134,7 @@ module "k8s_web" {
 
 # Monitoring (Prometheus + Grafana)
 module "monitoring" {
-  source = "../../modules/monitoring"
+  source = "./modules/monitoring"
 
   project_name           = var.project_name
   environment            = var.environment
@@ -163,7 +163,7 @@ module "monitoring" {
 
 # k6-operator (Load Testing)
 module "k6_operator" {
-  source = "../../modules/k6_operator"
+  source = "./modules/k6_operator"
 
   environment   = var.environment
   app_namespace = module.k8s_base.namespace
