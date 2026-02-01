@@ -347,17 +347,22 @@ spec:
 ```
 
 **3. Grafana k6 대시보드 자동 프로비저닝**
-- **Dashboard ID**: 19665 (k6 Prometheus)
-- **폴더**: "k6 Load Testing"
+- **방식**: ConfigMap으로 커스텀 대시보드 배포
+- **파일**: `infra/modules/monitoring/dashboards/k6-prometheus.json`
+- 원본(gnetId: 19665)의 버그 수정 버전 (HTTP request failures 쿼리 수정)
 - terraform apply 시 자동 설치됨
 
-### 수동 대시보드 Import (필요시)
+### 대시보드 수정 시
 ```bash
-# Grafana 접속 (port-forward)
-kubectl port-forward svc/prometheus-grafana -n monitoring 3000:80
+# 1. Grafana UI에서 대시보드 수정
+# 2. Share > Export > Save to file
 
-# 브라우저에서 http://localhost:3000 접속
-# Dashboard > Import > ID: 19665
+# 3. JSON 파일을 dashboards 폴더로 복사
+cp ~/Downloads/k6-prometheus-*.json \
+   infra/modules/monitoring/dashboards/k6-prometheus.json
+
+# 4. Terraform 적용
+cd infra && terraform apply -target=module.monitoring
 ```
 
 ---
@@ -370,7 +375,7 @@ kubectl port-forward svc/prometheus-grafana -n monitoring 3000:80
 - [x] k6-operator 배포 (terraform apply)
 - [x] Smoke Test 실행 및 결과 확인
 - [x] Breakpoint Test 실행 및 결과 확인
-- [x] Grafana 대시보드 연동 (Dashboard ID: 19665)
+- [x] Grafana 대시보드 연동 (커스텀 대시보드, ConfigMap 관리)
 - [x] 부하테스트 결과 문서화 ([test-result.md](./test-result.md))
 - [x] Loadtest 노드 격리 구현 ([loadtest-node.md](./loadtest-node.md))
 - [ ] Load Test 재실행 (격리된 환경)

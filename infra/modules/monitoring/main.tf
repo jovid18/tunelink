@@ -127,30 +127,13 @@ resource "helm_release" "prometheus_stack" {
         }
         # 기본 대시보드 유지
         defaultDashboardsEnabled = true
-        # k6 대시보드 프로비저닝
-        dashboardProviders = {
-          "dashboardproviders.yaml" = {
-            apiVersion = 1
-            providers = [{
-              name            = "k6"
-              orgId           = 1
-              folder          = "k6 Load Testing"
-              type            = "file"
-              disableDeletion = false
-              editable        = true
-              options = {
-                path = "/var/lib/grafana/dashboards/k6"
-              }
-            }]
-          }
-        }
-        dashboards = {
-          k6 = {
-            k6-prometheus = {
-              gnetId     = 19665
-              revision   = 1
-              datasource = "Prometheus"
-            }
+        # k6 대시보드 sidecar 설정 (ConfigMap에서 자동 로드)
+        sidecar = {
+          dashboards = {
+            enabled = true
+            label   = "grafana_dashboard"
+            folder  = "/tmp/dashboards"
+            searchNamespace = local.namespace
           }
         }
       }
@@ -158,6 +141,24 @@ resource "helm_release" "prometheus_stack" {
   ]
 
   timeout = 600
+
+  depends_on = [kubernetes_namespace.monitoring]
+}
+
+# k6 대시보드 ConfigMap (Grafana sidecar가 자동으로 로드)
+resource "kubernetes_config_map" "k6_dashboard" {
+  metadata {
+    name      = "k6-prometheus-dashboard"
+    namespace = kubernetes_namespace.monitoring.metadata[0].name
+
+    labels = {
+      grafana_dashboard = "1"  # sidecar가 이 label을 감지
+    }
+  }
+
+  data = {
+    "k6-prometheus.json" = file("${path.module}/dashboards/k6-prometheus.json")
+  }
 
   depends_on = [kubernetes_namespace.monitoring]
 }

@@ -240,10 +240,12 @@ Grafana에 로그인하면 아래 대시보드가 자동 설치됨:
 
 ### 모듈 구조
 ```
-infra/terraform/modules/monitoring/
-├── main.tf       # Helm release 정의
+infra/modules/monitoring/
+├── main.tf       # Helm release + ConfigMap 정의
 ├── variables.tf  # 설정 변수
-└── outputs.tf    # 출력값 (port-forward 명령어 등)
+├── outputs.tf    # 출력값 (port-forward 명령어 등)
+└── dashboards/
+    └── k6-prometheus.json  # k6 대시보드 (커스텀, 버그 수정됨)
 ```
 
 ---
@@ -330,7 +332,7 @@ aws route53 change-resource-record-sets \
 | Kubernetes / Compute Resources / Node | 노드별 CPU/메모리 |
 | Kubernetes / Compute Resources / Pod | Pod별 리소스 |
 | Node Exporter / Nodes | EC2 노드 상세 (CPU, 디스크, 네트워크) |
-| k6 Load Testing / k6-prometheus (ID: 19665) | k6 부하테스트 결과 시각화 |
+| k6 Load Testing / k6-prometheus | k6 부하테스트 결과 시각화 (커스텀 대시보드) |
 
 ### k6 부하테스트 연동 (2026-01-29 추가)
 
@@ -344,7 +346,9 @@ k6 Runner Pod → Prometheus Remote Write → Prometheus → Grafana
 **설정 내용**
 1. Prometheus: `enableRemoteWriteReceiver = true`
 2. k6 TestRun: `--out experimental-prometheus-rw` 옵션으로 메트릭 전송
-3. Grafana: Dashboard ID 19665 자동 프로비저닝 ("k6 Load Testing" 폴더)
+3. Grafana: 커스텀 대시보드 ConfigMap으로 자동 프로비저닝
+   - 원본(gnetId: 19665)의 버그 수정 버전 사용
+   - 파일: `infra/modules/monitoring/dashboards/k6-prometheus.json`
 
 ---
 
@@ -355,6 +359,6 @@ k6 Runner Pod → Prometheus Remote Write → Prometheus → Grafana
 3. [x] Grafana Ingress 생성 (ALB)
 4. [x] Route53 DNS 등록 (grafana.hearttune.link)
 5. [x] Grafana 접속 확인
-6. [x] k6 부하테스트 대시보드 연동 (Dashboard ID: 19665)
+6. [x] k6 부하테스트 대시보드 연동 (커스텀 대시보드, ConfigMap 관리)
 7. [ ] (선택) 애플리케이션 메트릭 endpoint 추가 (/metrics)
 8. [ ] (선택) Slack/Discord 알람 연동
