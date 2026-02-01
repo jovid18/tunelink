@@ -128,6 +128,51 @@ resource "aws_eks_node_group" "main" {
   }
 }
 
+# EKS Node Group - Loadtest (테스트 시에만 사용, 평소엔 0)
+resource "aws_eks_node_group" "loadtest" {
+  count = var.loadtest_node_enabled ? 1 : 0
+
+  cluster_name    = aws_eks_cluster.main.name
+  node_group_name = "${local.name_prefix}-loadtest"
+  node_role_arn   = aws_iam_role.eks_nodes.arn
+  subnet_ids      = var.private_subnet_ids
+  version         = var.kubernetes_version
+  ami_type        = "AL2023_x86_64_STANDARD"
+
+  capacity_type  = "SPOT"
+  instance_types = ["t3.xlarge", "t3a.xlarge"]
+
+  scaling_config {
+    desired_size = var.loadtest_node_desired_size
+    min_size     = 0
+    max_size     = 2
+  }
+
+  labels = {
+    role = "loadtest"
+  }
+
+  taint {
+    key    = "role"
+    value  = "loadtest"
+    effect = "NO_SCHEDULE"
+  }
+
+  update_config {
+    max_unavailable = 1
+  }
+
+  depends_on = [
+    aws_iam_role_policy_attachment.eks_worker_node_policy,
+    aws_iam_role_policy_attachment.eks_cni_policy,
+    aws_iam_role_policy_attachment.eks_container_registry,
+  ]
+
+  tags = {
+    Name = "${local.name_prefix}-loadtest"
+  }
+}
+
 # OIDC Provider for IRSA (IAM Roles for Service Accounts)
 data "tls_certificate" "eks" {
   url = aws_eks_cluster.main.identity[0].oidc[0].issuer

@@ -58,9 +58,13 @@ module "eks" {
   kubernetes_version  = "1.33"
   node_instance_types = ["t3.small", "t3.medium", "t3a.small", "t3a.medium"]
   node_capacity_type  = "SPOT"
-  node_desired_size   = 4
+  node_desired_size   = 3
   node_min_size       = 2
   node_max_size       = 4
+
+  # Loadtest 노드 (테스트 시에만 활성화)
+  loadtest_node_enabled      = true
+  loadtest_node_desired_size = 0  # 0 = 꺼짐, 1 = 켜짐
 }
 
 # AWS Load Balancer Controller

@@ -73,8 +73,9 @@ resource "kubernetes_config_map" "k6_test_scripts" {
   }
 
   data = {
-    "smoke-test.js"  = file("${path.module}/scripts/smoke-test.js")
-    "load-test.js"   = file("${path.module}/scripts/load-test.js")
-    "stress-test.js" = file("${path.module}/scripts/stress-test.js")
+    "smoke-test.js"      = file("${path.module}/scripts/smoke-test.js")
+    "load-test.js"       = file("${path.module}/scripts/load-test.js")
+    "stress-test.js"     = file("${path.module}/scripts/stress-test.js")
+    "breakpoint-test.js" = file("${path.module}/scripts/breakpoint-test.js")
   }
 }

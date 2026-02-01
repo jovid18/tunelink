@@ -53,3 +53,16 @@ variable "node_max_size" {
   type        = number
   default     = 3
 }
+
+# Loadtest Node Group
+variable "loadtest_node_enabled" {
+  description = "Enable loadtest node group"
+  type        = bool
+  default     = false
+}
+
+variable "loadtest_node_desired_size" {
+  description = "Desired number of loadtest nodes (0 = off, 1+ = on)"
+  type        = number
+  default     = 0
+}
