@@ -69,6 +69,21 @@ resource "aws_instance" "bastion" {
   }
 }
 
+# Elastic IP for Bastion (IP 고정)
+resource "aws_eip" "bastion" {
+  domain = "vpc"
+
+  tags = {
+    Name = "${local.name_prefix}-bastion-eip"
+  }
+}
+
+# Associate EIP with Bastion instance
+resource "aws_eip_association" "bastion" {
+  instance_id   = aws_instance.bastion.id
+  allocation_id = aws_eip.bastion.id
+}
+
 # Allow Bastion to access RDS
 resource "aws_security_group_rule" "rds_from_bastion" {
   type                     = "ingress"

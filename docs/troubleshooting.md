@@ -114,6 +114,68 @@ terraform plan
 
 ---
 
+### Bastion Host IP가 재시작 시 변경되는 문제
+
+**날짜:** 2025-02-01
+
+**증상:**
+
+- Bastion EC2 인스턴스 재시작 후 Public IP가 변경됨
+- DataGrip SSH Tunnel 연결 실패
+- 문서에 기록된 IP와 실제 IP 불일치
+
+**원인:**
+
+- EC2 인스턴스에 자동 할당된 Public IP는 인스턴스 중지/시작 시 변경됨
+- Elastic IP를 사용하지 않으면 IP가 고정되지 않음
+
+**해결 방법:**
+
+- Bastion 모듈에 Elastic IP 추가
+
+```hcl
+# infra/modules/bastion/main.tf
+
+# Elastic IP for Bastion (IP 고정)
+resource "aws_eip" "bastion" {
+  domain = "vpc"
+
+  tags = {
+    Name = "${local.name_prefix}-bastion-eip"
+  }
+}
+
+# Associate EIP with Bastion instance
+resource "aws_eip_association" "bastion" {
+  instance_id   = aws_instance.bastion.id
+  allocation_id = aws_eip.bastion.id
+}
+```
+
+```hcl
+# infra/modules/bastion/outputs.tf
+
+output "public_ip" {
+  description = "Bastion public IP (Elastic IP)"
+  value       = aws_eip.bastion.public_ip
+}
+```
+
+**적용:**
+
+```bash
+cd infra/terraform/envs/dev
+terraform plan -target=module.bastion
+terraform apply -target=module.bastion
+```
+
+**비용:**
+
+- Elastic IP가 EC2에 연결되어 있으면: **무료**
+- 연결 안 된 EIP만 시간당 ~$0.005 비용 발생
+
+---
+
 ## Helm
 
 ### k6-operator Helm 설치 시 Namespace 충돌

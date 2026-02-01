@@ -1,6 +1,6 @@
 output "public_ip" {
-  description = "Bastion public IP"
-  value       = aws_instance.bastion.public_ip
+  description = "Bastion public IP (Elastic IP)"
+  value       = aws_eip.bastion.public_ip
 }
 
 output "public_dns" {

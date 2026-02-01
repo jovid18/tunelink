@@ -442,7 +442,7 @@ Key Pair: tunelink-bastion
 
 **접속 정보:**
 ```
-Host: 3.36.60.248
+Host: 3.36.215.254
 User: ec2-user
 Key: ~/.ssh/tunelink-bastion.pem
 ```
@@ -451,7 +451,7 @@ Key: ~/.ssh/tunelink-bastion.pem
 ```
 [SSH/SSL 탭]
 ✅ Use SSH tunnel
-Host: 3.36.60.248
+Host: 3.36.215.254
 Port: 22
 User: ec2-user
 Auth type: Key pair
@@ -467,7 +467,7 @@ Database: tunelink
 
 **SSH 접속 테스트:**
 ```bash
-ssh -i ~/.ssh/tunelink-bastion.pem ec2-user@3.36.60.248
+ssh -i ~/.ssh/tunelink-bastion.pem ec2-user@3.36.215.254
 ```
 
 ---
@@ -1039,5 +1039,5 @@ kubectl run -it --rm mysql-client --image=mysql:8 -n tunelink -- mysql -h {RDS_E
   - ~~`.github/workflows/infra.yml`~~ - 삭제 (로컬에서 관리)
 - [x] Bastion Host 추가
   - EC2 Key Pair 생성: tunelink-bastion
-  - Bastion EC2: 3.36.60.248
+  - Bastion EC2: 3.36.215.254 (Elastic IP - 고정)
   - DataGrip SSH Tunnel로 RDS 접속 가능
