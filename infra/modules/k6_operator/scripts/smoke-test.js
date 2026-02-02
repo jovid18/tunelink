@@ -10,7 +10,7 @@ export const options = {
   },
 };
 
-const BASE_URL = 'http://tunelink-dev-api.tunelink.svc.cluster.local';
+const BASE_URL = 'https://hearttune.link';
 
 export default function () {
   // 1. Health check

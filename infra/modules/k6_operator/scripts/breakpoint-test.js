@@ -30,7 +30,7 @@ export const options = {
   },
 };
 
-const BASE_URL = 'http://tunelink-dev-api.tunelink.svc.cluster.local';
+const BASE_URL = 'https://hearttune.link';
 const CREATE_RATIO = 20; // 1:20 비율 (생성 1회당 리다이렉트 20회)
 
 // VU별 생성된 URL 저장

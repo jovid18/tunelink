@@ -64,7 +64,7 @@ module "eks" {
 
   # Loadtest 노드 (테스트 시에만 활성화)
   loadtest_node_enabled      = true
-  loadtest_node_desired_size = 0  # 0 = 꺼짐, 1 = 켜짐
+  loadtest_node_desired_size = 1  # 0 = 꺼짐, 1 = 켜짐
 }
 
 # AWS Load Balancer Controller

@@ -29,6 +29,7 @@ func main() {
 
 	// Initialize handlers (inbound adapters)
 	urlHandler := httpAdapter.NewURLHandler(urlUseCase, cfg.BaseURL)
+	testHandler := httpAdapter.NewTestHandler(cfg.DB)
 
 	// Setup router
 	r := gin.Default()
@@ -36,7 +37,7 @@ func main() {
 	// CORS middleware
 	r.Use(func(c *gin.Context) {
 		c.Header("Access-Control-Allow-Origin", "*")
-		c.Header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		c.Header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
 		c.Header("Access-Control-Allow-Headers", "Content-Type")
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(204)
@@ -49,6 +50,10 @@ func main() {
 	r.GET("/health", httpAdapter.Health)
 	r.POST("/api/urls", urlHandler.Create)
 	r.GET("/r/:shortUrl", urlHandler.Redirect)
+
+	// Test routes (for load testing)
+	r.GET("/api/test/stats", testHandler.GetStats)
+	r.DELETE("/api/test/urls", testHandler.DeleteAllURLs)
 
 	// Start server
 	port := os.Getenv("PORT")

@@ -3,16 +3,14 @@ import { check, sleep } from 'k6';
 
 export const options = {
   stages: [
-    { duration: '2m', target: 100 },  // ramp up to 100 users
-    { duration: '5m', target: 100 },  // stay at 100 users
-    { duration: '2m', target: 200 },  // ramp up to 200 users
-    { duration: '5m', target: 200 },  // stay at 200 users
-    { duration: '2m', target: 0 },    // ramp down
+    { duration: '1m', target: 1000 },  // ramp up to 1000 users
+    { duration: '3m', target: 1000 },  // stay at 1000 users
+    { duration: '1m', target: 0 },     // ramp down
   ],
 };
 
-const BASE_URL = 'http://tunelink-dev-api.tunelink.svc.cluster.local';
-const CREATE_RATIO = 20; // 1:20 비율 (생성 1회당 리다이렉트 20회)
+const BASE_URL = 'https://hearttune.link';
+const CREATE_RATIO = 100; // 1:100 비율 (생성 1회당 리다이렉트 100회)
 
 // VU별 생성된 URL 저장
 const createdUrls = [];
