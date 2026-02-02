@@ -74,13 +74,13 @@ question: "어떤 부하테스트를 실행할까요?"
 header: "테스트 선택"
 options:
   - label: "Smoke Test (Recommended)"
-    description: "5 VUs, 30초 - 기본 동작 확인용. 빠르게 시스템 정상 동작 검증"
+    description: "5 VUs × 1 iter = 5 URLs, 각 10번 redirect - 기본 동작 확인"
   - label: "Load Test"
-    description: "20→50 VUs, 7분 - 일반적인 부하 상황 테스트"
+    description: "100 VUs × 3 iter = 300 URLs, 각 100번 redirect - 일반 부하"
   - label: "Stress Test"
-    description: "1000 VUs, 5분 - 높은 부하에서 시스템 안정성 테스트"
+    description: "1000 VUs × 3 iter = 3000 URLs, 각 100번 redirect - 고부하"
   - label: "Breakpoint Test"
-    description: "10→500 RPS, ~9분 - 시스템 한계점 탐색 (에러 15% 또는 p95>10s 시 자동 중단)"
+    description: "10→500 RPS, ~7분 - 시스템 한계점 탐색 (에러 15% 시 자동 중단)"
 ```
 
 ### Step 2: 테스트 실행
@@ -238,7 +238,7 @@ kubectl logs -n tunelink -l app=k6 --tail=200
 4. **결과에서 핵심 메트릭 추출**:
 
 k6 출력에서 다음 메트릭을 파싱합니다:
-- `http_req_duration` (avg, min, med, max, p90, p95)
+- `http_req_duration` (avg, min, med, max, p90, p95, p99)
 - `http_req_failed` (에러율)
 - `http_reqs` (총 요청 수)
 - `vus` / `vus_max` (가상 사용자 수)
@@ -300,9 +300,9 @@ curl -s https://hearttune.link/api/test/stats
 | Error Rate | X.XX% | <1% | PASS/FAIL |
 
 ### 상세 메트릭
-| 메트릭 | avg | min | med | max | p(90) | p(95) |
-|--------|-----|-----|-----|-----|-------|-------|
-| http_req_duration | - | - | - | - | - | - |
+| 메트릭 | avg | min | med | max | p(90) | p(95) | p(99) |
+|--------|-----|-----|-----|-----|-------|-------|-------|
+| http_req_duration | - | - | - | - | - | - | - |
 
 ### Checks
 | Check | 통과율 |
@@ -353,12 +353,12 @@ kubectl delete testrun [테스트명] -n tunelink
 
 ## 테스트 유형 비교
 
-| 유형 | 부하 | 시간 | 목적 | 중단 조건 |
-|------|------|------|------|----------|
-| Smoke | 5 VUs | 30초 | 기본 동작 확인 | 시간 |
-| Load | 20→50 VUs | 7분 | 일반 부하 테스트 | 시간 |
-| Stress | 1000 VUs | 5분 | 고부하 안정성 | 시간 |
-| **Breakpoint** | **10→500 RPS** | **~9분** | **한계점 탐색** | **에러율/응답시간** |
+| 유형 | Executor | 부하 | 예상 결과 | 목적 |
+|------|----------|------|-----------|------|
+| Smoke | per-vu-iterations | 5 VUs × 1 iter | 5 URLs, 50 clicks | 기본 동작 확인 |
+| Load | per-vu-iterations | 100 VUs × 3 iter | 300 URLs, 30K clicks | 일반 부하 |
+| Stress | per-vu-iterations | 1000 VUs × 3 iter | 3K URLs, 300K clicks | 고부하 안정성 |
+| Breakpoint | ramping-arrival-rate | 10→500 RPS | 가변 | 한계점 탐색 |
 
 ## 에러 처리
 

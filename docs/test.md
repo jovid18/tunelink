@@ -7,7 +7,7 @@
 | 도구    | 평가     | 비고                    |
 | ------- | -------- | ----------------------- |
 | k6      | ⭐⭐⭐⭐ | **선정**                |
-| Locust  | ⭐⭐⭐   | 채용 요건에 명시됨      |
+| Locust  | ⭐⭐⭐   | Python 기반, 웹 UI 제공 |
 | Vegeta  | ⭐⭐⭐   | Go 프로젝트와 스택 일치 |
 | Gatling | ⭐⭐     | Scala 러닝커브          |
 | JMeter  | ⭐       | 레거시, GUI 무거움      |
@@ -100,35 +100,48 @@ https://hearttune.link
 
 경로: `infra/modules/k6_operator/scripts/`
 
+### 공통 설계 원칙
+
+모든 테스트는 **per-vu-iterations** executor를 사용하여 정확한 요청 수를 보장합니다:
+- 각 VU가 정해진 횟수만큼 iteration 실행
+- 각 iteration에서 1개 URL 생성 + N번 redirect
+- 시간 기반이 아닌 **횟수 기반** 테스트로 결과 예측 가능
+
 ### smoke-test.js
 
 - **목적**: 기본 동작 확인
-- **부하**: 5 VUs, 30초
-- **시나리오**: Health check만
+- **Executor**: `per-vu-iterations`
+- **부하**: 5 VUs × 1 iteration = **5 URLs**
+- **시나리오**: Health → URL 생성 → 10번 redirect
+- **예상 결과**: 5 URLs, 각 10 clicks
 - **Threshold**: p(95) < 500ms, 에러율 < 1%
 
 ### load-test.js
 
 - **목적**: 일반적인 부하 상황 테스트
-- **부하**: 20 → 50 VUs, 7분
-- **시나리오**: Health → URL 생성 → 리다이렉트
+- **Executor**: `per-vu-iterations`
+- **부하**: 100 VUs × 3 iterations = **300 URLs**
+- **시나리오**: Health → URL 생성 → 100번 redirect
+- **예상 결과**: 300 URLs, 각 100 clicks (총 30,000 redirect 요청)
 - **Threshold**: p(95) < 1000ms, 에러율 < 5%
 
 ### stress-test.js
 
 - **목적**: 고부하 안정성 테스트
-- **부하**: 0 → 1000 VUs (1분 ramp-up), 6분 유지
-- **시나리오**: Health → URL 생성 (4분까지) → 리다이렉트 (6분까지)
-- **특징**: 시간 기반 URL 생성 제한 (각 URL이 100번 redirect 요청 받도록 설계)
+- **Executor**: `per-vu-iterations`
+- **부하**: 1000 VUs × 3 iterations = **3,000 URLs**
+- **시나리오**: Health → URL 생성 → 100번 redirect
+- **예상 결과**: 3,000 URLs, 각 100 clicks (총 300,000 redirect 요청)
 - **Threshold**: 없음 (한계 측정 목적)
 
 ### breakpoint-test.js
 
 - **목적**: 시스템 한계점(Breaking Point) 탐색
+- **Executor**: `ramping-arrival-rate` (RPS 기반)
 - **부하**: 10 → 500 RPS (점진 증가), 최대 1000 VUs
-- **시나리오**: Health → URL 생성 → 리다이렉트
+- **시나리오**: Health → URL 생성 → 100번 redirect (반복)
 - **Threshold**: 에러율 < 15%, p(95) < 10초 (초과 시 자동 중단)
-- **특징**: `ramping-arrival-rate` executor 사용, 일정 RPS 유지하며 부하 증가
+- **특징**: 일정 RPS 유지하며 부하 증가, 한계점 도달 시 자동 중단
 
 ---
 
