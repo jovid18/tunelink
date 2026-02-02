@@ -1,56 +1,99 @@
 # 부하테스트 결과
 
-## 테스트 방식 (2026-02-03 업데이트)
+## Stress Test - 2026-02-03 00:12
 
-### per-vu-iterations 방식 채택
+### 테스트 설정
+| 항목 | 값 |
+|------|-----|
+| 테스트 유형 | Stress Test |
+| VUs | 1000 (4 runners × 250) |
+| Iterations | 3 per VU (총 3000) |
+| Max Duration | 10m |
+| Parallelism | 4 |
+| 실행 시간 | 2026-02-03 00:12:02 KST |
 
-기존 시간 기반(ramping-vus) 방식에서 **횟수 기반(per-vu-iterations)** 방식으로 변경했습니다.
+### 결과 요약
 
-**변경 이유:**
-- 시간 기반 방식은 VU 시작 시점 차이로 인해 각 URL의 redirect 횟수가 불균일
-- 횟수 기반 방식은 각 URL이 정확히 N번 redirect 요청을 받도록 보장
+**4개 Runner Pod 합산 결과:**
 
-**새로운 테스트 설계:**
-```
-각 VU가:
-1. URL 생성
-2. 해당 URL에 100번 redirect
-3. iteration 완료
-4. (iterations 수만큼 반복)
-```
+| 지표 | 결과 | Threshold | 상태 |
+|------|------|-----------|------|
+| 총 요청 수 | 126,900 | - | - |
+| 성공률 | 71.8% | >99% | **FAIL** |
+| 에러율 | 28.2% | <1% | **FAIL** |
+| p(95) Latency | ~490ms | <500ms | PASS |
+| p(99) Latency | ~1.1s | - | - |
 
-**Stress Test 기준:**
-- 1000 VUs × 3 iterations = 3,000 URLs
-- 각 URL × 100 redirect = 300,000 redirect 요청
-- k6에서 100% 성공 시 → DB에 300,000 clicks 기록 예상
+### 상세 메트릭 (Runner별 평균)
 
-### 검증 방법
+| 메트릭 | avg | min | med | max | p(90) | p(95) | p(99) |
+|--------|-----|-----|-----|-----|-------|-------|-------|
+| http_req_duration | ~269ms | ~2ms | ~211ms | ~18s | ~400ms | ~490ms | ~1.1s |
+| http_req_duration (success) | ~261ms | ~2ms | ~219ms | ~4s | ~406ms | ~486ms | ~706ms |
 
-테스트 후 `/api/test/stats` API로 DB 통계 확인:
-```json
-{
-  "totalUrls": 3000,      // 예상: 3000
-  "totalClicks": 300000,  // 예상: 300000 (실제는 DB 동시성에 따라 다를 수 있음)
-  "avgClicks": 100,       // 예상: 100
-  "minClicks": 100,       // 예상: 100
-  "maxClicks": 100        // 예상: 100
-}
-```
+### Checks 결과
 
-**참고:** k6에서 redirect 요청이 100% 성공해도 DB 기록은 동시성 이슈로 누락될 수 있습니다.
-이 차이는 캐싱(Redis) 도입 전후 비교에 유용합니다.
+| Check | Runner 1 | Runner 2 | Runner 3 | Runner 4 |
+|-------|----------|----------|----------|----------|
+| health ok | 100% | 100% | 100% | 100% |
+| create ok | 54% | 35% | 34% | 37% |
+| redirect ok | 74% | 70% | 70% | 72% |
 
----
+**합산:**
+- Total Checks: ~126,900
+- Checks Succeeded: ~71.8%
+- Checks Failed: ~28.2%
 
-## 테스트 이력
+### DB 통계 (테스트 후)
+| 항목 | 값 |
+|------|-----|
+| 총 URL 수 | 1,209 |
+| 총 클릭 수 | 63,276 |
+| 평균 클릭 | 52.3 |
+| 최소 클릭 | 21 |
+| 최대 클릭 | 100 |
 
-| 날짜 | 테스트 | 결과 | 비고 |
-|------|--------|------|------|
-| (예정) | Stress (1000 VUs, 3 iter) | - | Connection Pool 롤백 후 재테스트 |
+### 처리량
+| Runner | Requests/s | Iterations/s |
+|--------|------------|--------------|
+| Runner 1 | 348/s | 6.19/s |
+| Runner 2 | 232/s | 6.27/s |
+| Runner 3 | 225/s | 6.16/s |
+| Runner 4 | 242/s | 6.16/s |
+| **합계** | **~1,047/s** | **~24.8/s** |
 
----
+### 분석
 
-## Grafana 대시보드
+**문제점:**
+1. **URL 생성 실패율 높음 (54-66%)**: 동시 요청 시 URL 생성 API에서 병목 발생
+2. **Redirect 실패율 ~28%**: 생성되지 않은 URL에 대한 redirect 요청 실패
+3. **최대 응답시간 17-18초**: 일부 요청에서 심각한 지연 발생
+4. **예상 URL 수 불일치**: 3000 iterations에서 예상 1209개 URL 생성 (약 40%)
 
-- URL: https://grafana.hearttune.link
+**병목 추정:**
+- RDS Connection Pool 한계
+- API 서버 동시 처리 용량
+- 동시 URL 생성 시 충돌/타임아웃
+
+### 권장사항
+1. URL 생성 API의 동시성 처리 개선 필요
+2. RDS Connection Pool 확장 검토
+3. API 서버 수평 확장 (HPA 설정 조정)
+4. 재시도 로직 및 에러 핸들링 강화
+
+### Grafana 대시보드
+
+![Stress Test 2026-02-03 00:12](./images/stress-test-20260203-0012-grafana.png)
+
+**Grafana 메트릭 (스크린샷 기준):**
+| 항목 | 값 |
+|------|-----|
+| HTTP requests | 126,900 |
+| HTTP request failures | 35,383 (27.9%) |
+| Peak RPS | 363 req/s |
+| HTTP Request Duration | 1.22s |
+
+- URL: http://grafana.hearttune.link
 - Dashboard: k6 Load Testing (ID: 19665)
+
+---
