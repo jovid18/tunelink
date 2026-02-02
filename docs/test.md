@@ -116,9 +116,10 @@ https://hearttune.link
 
 ### stress-test.js
 
-- **목적**: 시스템 한계 테스트
-- **부하**: 100 → 200 VUs, 16분
-- **시나리오**: Health → URL 생성 → 리다이렉트
+- **목적**: 고부하 안정성 테스트
+- **부하**: 0 → 1000 VUs (1분 ramp-up), 6분 유지
+- **시나리오**: Health → URL 생성 (4분까지) → 리다이렉트 (6분까지)
+- **특징**: 시간 기반 URL 생성 제한 (각 URL이 100번 redirect 요청 받도록 설계)
 - **Threshold**: 없음 (한계 측정 목적)
 
 ### breakpoint-test.js

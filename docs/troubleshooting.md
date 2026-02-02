@@ -279,6 +279,75 @@ terraform apply
 
 ## Kubernetes
 
+### MySQL "Too many connections" 에러
+
+**날짜:** 2026-02-02
+
+**증상:**
+
+- 부하테스트 중 redirect 요청 실패율 급증 (44% 실패)
+- API Pod 로그에 아래 에러 반복:
+
+```
+Error 1040: Too many connections
+Error 1040 (08004): Too many connections
+```
+
+**원인:**
+
+- API 코드에서 DB Connection Pool 설정이 없음
+- 각 Pod가 무제한으로 DB 연결 생성 시도
+- RDS db.t3.micro 인스턴스의 max_connections (~66-87) 초과
+
+**문제 코드:**
+
+```go
+// infrastructure/config.go
+func connectDB() *gorm.DB {
+    db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{...})
+    // ❌ Connection Pool 설정 없음!
+    return db
+}
+```
+
+**해결 방법:**
+
+- GORM에서 underlying sql.DB를 가져와 Connection Pool 설정 추가
+
+```go
+func connectDB() *gorm.DB {
+    db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{...})
+
+    // Connection Pool 설정
+    sqlDB, err := db.DB()
+    if err != nil {
+        log.Fatal("Failed to get database instance:", err)
+    }
+    sqlDB.SetMaxOpenConns(25)               // Pod당 최대 25개 연결
+    sqlDB.SetMaxIdleConns(10)               // 유휴 연결 10개 유지
+    sqlDB.SetConnMaxLifetime(5 * time.Minute) // 연결 수명 5분
+
+    return db
+}
+```
+
+**설정값 계산:**
+
+| 항목 | 값 | 설명 |
+|------|-----|------|
+| RDS max_connections | ~66-87 | db.t3.micro 기준 |
+| API Pods | 2개 | 현재 replica 수 |
+| Pod당 MaxOpenConns | 25 | 2 × 25 = 50 (RDS 한도 내) |
+| 여유 연결 | ~16-37 | 다른 클라이언트용 (Bastion 등) |
+
+**추가 옵션: RDS Proxy**
+
+- Connection Pool을 앱이 아닌 AWS에서 중앙 관리
+- Pod 스케일 아웃 시에도 RDS 연결 수 일정 유지
+- 비용 발생하므로 대규모 트래픽 시 고려
+
+---
+
 ### k6 부하테스트 Pod 스케줄링 실패 (Too many pods)
 
 **날짜:** 2025-01-25

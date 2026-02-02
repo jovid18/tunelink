@@ -60,14 +60,47 @@
 
 #### 병목 지점
 - **RDS db.t3.micro**: CPU/Connection 한계로 인한 높은 실패율
-- **API Pod 3개**: 1000 VUs 동시 처리에 부족
+- **API Pod 2개**: 1000 VUs 동시 처리에 부족
 
-### 권장사항
-1. **현재 인프라 안정 처리량**: ~200-300 VUs 추정
-2. **1000 VUs 지원을 위한 개선**:
-   - RDS 인스턴스 업그레이드 (db.t3.small 이상)
-   - API Pod replica 증가 (3 → 6)
-3. **다음 테스트**: 낮은 VUs (200-500)에서 테스트하여 안정 구간 확인
+#### 원인 분석 (로그 확인)
+
+API Pod 로그에서 핵심 에러 발견:
+
+```
+Error 1040: Too many connections
+Error 1040 (08004): Too many connections
+```
+
+**Root Cause**: DB Connection Pool 미설정
+- API 코드에서 GORM Connection Pool 설정이 없음
+- 각 Pod가 무제한으로 DB 연결 생성 시도
+- RDS db.t3.micro의 max_connections (~66-87) 초과
+- 연결 한도 도달 시 즉시 에러 반환 → redirect 실패
+
+**추가 발견**:
+- SLOW SQL 경고 (200ms 이상): SELECT/UPDATE 쿼리 지연
+- 일부 쿼리 1000ms+ 소요 (정상 시 ~10ms)
+
+### 해결 방안
+
+#### 즉시 적용 (코드 수정)
+Connection Pool 설정 추가 (`apps/api/internal/infrastructure/config.go`):
+
+```go
+sqlDB, _ := db.DB()
+sqlDB.SetMaxOpenConns(25)               // Pod당 최대 25개 연결
+sqlDB.SetMaxIdleConns(10)               // 유휴 연결 10개 유지
+sqlDB.SetConnMaxLifetime(5 * time.Minute) // 연결 수명 5분
+```
+
+#### 추가 개선 (인프라)
+1. **RDS 업그레이드**: db.t3.small 이상 (max_connections 증가)
+2. **API Pod 증가**: 2 → 4개
+3. **RDS Proxy 도입**: 대규모 스케일 시 고려
+
+### 다음 테스트
+1. Connection Pool 설정 후 동일 조건 재테스트
+2. 성공률 99% 이상 달성 여부 확인
 
 ### Grafana 대시보드
 - URL: https://grafana.hearttune.link
