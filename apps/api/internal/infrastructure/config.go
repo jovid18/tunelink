@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
@@ -52,12 +53,21 @@ func connectDB() *gorm.DB {
 		log.Fatal("Failed to connect to database:", err)
 	}
 
+	// Connection pool 설정
+	sqlDB, err := db.DB()
+	if err != nil {
+		log.Fatal("Failed to get database instance:", err)
+	}
+	sqlDB.SetMaxOpenConns(25)               // Pod당 최대 25개 연결
+	sqlDB.SetMaxIdleConns(10)               // 유휴 연결 10개 유지
+	sqlDB.SetConnMaxLifetime(5 * time.Minute) // 연결 수명 5분
+
 	// Auto migrate
 	if err := db.AutoMigrate(&urlDomain.URL{}); err != nil {
 		log.Fatal("Failed to migrate database:", err)
 	}
 
-	log.Println("Connected to MySQL with GORM")
+	log.Println("Connected to MySQL with GORM (pool: max=25, idle=10)")
 	return db
 }
 
