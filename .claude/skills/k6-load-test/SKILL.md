@@ -78,7 +78,7 @@ options:
   - label: "Load Test"
     description: "20→50 VUs, 7분 - 일반적인 부하 상황 테스트"
   - label: "Stress Test"
-    description: "100→200 VUs, 16분 - 높은 부하에서 시스템 안정성 테스트"
+    description: "1000 VUs, 5분 - 높은 부하에서 시스템 안정성 테스트"
   - label: "Breakpoint Test"
     description: "10→500 RPS, ~9분 - 시스템 한계점 탐색 (에러 15% 또는 p95>10s 시 자동 중단)"
 ```
@@ -287,8 +287,8 @@ curl -s https://hearttune.link/api/test/stats
 | 항목 | 값 |
 |------|-----|
 | 테스트 유형 | Smoke / Load / Stress / Breakpoint |
-| VUs | 5 / 20-50 / 100-200 / max 1000 |
-| Duration | 30s / 7m / 16m / ~9m (자동 중단) |
+| VUs | 5 / 20-50 / 1000 / max 1000 |
+| Duration | 30s / 7m / 5m / ~9m (자동 중단) |
 | 실행 시간 | YYYY-MM-DD HH:MM:SS |
 
 ### 결과 요약
@@ -357,7 +357,7 @@ kubectl delete testrun [테스트명] -n tunelink
 |------|------|------|------|----------|
 | Smoke | 5 VUs | 30초 | 기본 동작 확인 | 시간 |
 | Load | 20→50 VUs | 7분 | 일반 부하 테스트 | 시간 |
-| Stress | 100→200 VUs | 16분 | 고부하 안정성 | 시간 |
+| Stress | 1000 VUs | 5분 | 고부하 안정성 | 시간 |
 | **Breakpoint** | **10→500 RPS** | **~9분** | **한계점 탐색** | **에러율/응답시간** |
 
 ## 에러 처리

@@ -31,10 +31,11 @@ export const options = {
 };
 
 const BASE_URL = 'https://hearttune.link';
-const CREATE_RATIO = 20; // 1:20 비율 (생성 1회당 리다이렉트 20회)
+const CLICKS_PER_URL = 20; // URL 1개당 20번 조회 후 새 URL 생성
 
-// VU별 생성된 URL 저장
-const createdUrls = [];
+// VU별 현재 URL과 조회 카운트
+let currentUrl = null;
+let redirectCount = 0;
 
 export default function () {
   // 1. Health check (lightweight)
@@ -43,14 +44,11 @@ export default function () {
     'health ok': (r) => r.status === 200,
   });
 
-  // 2. 1:20 비율로 생성 vs 리다이렉트 결정
-  const shouldCreate = createdUrls.length === 0 || __ITER % CREATE_RATIO === 0;
-
-  if (shouldCreate) {
-    // URL 생성
+  // 2. 20번 조회 완료 시 새 URL 생성
+  if (currentUrl === null || redirectCount >= CLICKS_PER_URL) {
     const createRes = http.post(
       `${BASE_URL}/api/urls`,
-      JSON.stringify({ originalUrl: `https://example.com/breakpoint/${__VU}/${__ITER}` }),
+      JSON.stringify({ originalUrl: `https://example.com/breakpoint/${__VU}/${Date.now()}` }),
       { headers: { 'Content-Type': 'application/json' } }
     );
 
@@ -59,24 +57,18 @@ export default function () {
     });
 
     if (createSuccess && createRes.status === 201) {
-      const shortUrl = createRes.json('shortUrl');
-      createdUrls.push(shortUrl);
+      currentUrl = createRes.json('shortUrl');
+      redirectCount = 0;
+    }
+  }
 
-      // 생성 직후 리다이렉트 테스트
-      const redirectRes = http.get(`${BASE_URL}/r/${shortUrl}`, { redirects: 0 });
-      check(redirectRes, {
-        'redirect ok': (r) => r.status === 302,
-      });
-    }
-  } else {
-    // 기존 URL로 리다이렉트만
-    if (createdUrls.length > 0) {
-      const randomUrl = createdUrls[Math.floor(Math.random() * createdUrls.length)];
-      const redirectRes = http.get(`${BASE_URL}/r/${randomUrl}`, { redirects: 0 });
-      check(redirectRes, {
-        'redirect ok': (r) => r.status === 302,
-      });
-    }
+  // 3. Redirect (URL이 있을 때만)
+  if (currentUrl) {
+    const redirectRes = http.get(`${BASE_URL}/r/${currentUrl}`, { redirects: 0 });
+    check(redirectRes, {
+      'redirect ok': (r) => r.status === 302,
+    });
+    redirectCount++;
   }
 
   // 부하를 높이기 위해 sleep 최소화
