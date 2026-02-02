@@ -340,6 +340,17 @@ func connectDB() *gorm.DB {
 | Pod당 MaxOpenConns | 25 | 2 × 25 = 50 (RDS 한도 내) |
 | 여유 연결 | ~16-37 | 다른 클라이언트용 (Bastion 등) |
 
+**적용 결과 (2026-02-03 Stress Test):**
+
+| 지표 | 적용 전 | 적용 후 |
+|------|--------|--------|
+| 에러율 | 28.2% | 0% |
+| URL 생성 성공률 | ~40% | 100% |
+| Peak RPS | 363 req/s | 733 req/s |
+
+- Connection Pool 설정만으로 고부하 환경(1000 VUs)에서 안정성 확보
+- 상세 결과: [test-result.md](./test-result.md)
+
 **추가 옵션: RDS Proxy**
 
 - Connection Pool을 앱이 아닌 AWS에서 중앙 관리
