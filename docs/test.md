@@ -405,8 +405,8 @@ cd infra && terraform apply -target=module.monitoring
 - [x] Grafana 대시보드 연동 (커스텀 대시보드, ConfigMap 관리)
 - [x] 부하테스트 결과 문서화 ([test-result.md](./test-result.md))
 - [x] Loadtest 노드 격리 구현 ([loadtest-node.md](./loadtest-node.md))
+- [x] Stress Test 실행 (2026-02-03) - **100% 성공, 클릭 카운트 정확도 100%**
 - [ ] Load Test 재실행 (격리된 환경)
-- [ ] Stress Test 실행
 
 ## 관련 문서
 

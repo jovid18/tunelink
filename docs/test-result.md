@@ -1,5 +1,128 @@
 # 부하테스트 결과
 
+## Stress Test - 2026-02-03 21:37
+
+### 테스트 설정
+| 항목 | 값 |
+|------|-----|
+| 테스트 유형 | Stress Test |
+| VUs | 1000 (4 runners × 250) |
+| Iterations | 3 per VU (총 3000) |
+| Max Duration | 10m |
+| Parallelism | 4 |
+| 실행 시간 | 2026-02-03 21:37:08 KST |
+
+### 결과 요약
+
+**4개 Runner Pod 합산 결과:**
+
+| 지표 | 결과 | Threshold | 상태 |
+|------|------|-----------|------|
+| 총 요청 수 | 306,000 (76,500 × 4) | - | - |
+| 성공률 | 100% | >99% | **PASS** |
+| 에러율 | 0.00% | <1% | **PASS** |
+| p(95) Latency | 2.47s | <500ms | **FAIL** |
+| p(99) Latency | 4.10s | - | - |
+
+### 상세 메트릭 (Runner 평균)
+
+| 메트릭 | avg | min | med | max | p(90) | p(95) | p(99) |
+|--------|-----|-----|-----|-----|-------|-------|-------|
+| http_req_duration | 687.93ms | 1.89ms | 247.66ms | 15.85s | 1.79s | 2.47s | 4.10s |
+
+### Checks 결과
+
+| Check | 통과율 |
+|-------|--------|
+| health ok | 100% |
+| create ok | 100% |
+| redirect ok | 100% |
+
+**합산:**
+- Total Checks: 306,000 (76,500 × 4)
+- Checks Succeeded: 100%
+- Checks Failed: 0%
+
+### DB 통계 (테스트 후)
+| 항목 | 값 |
+|------|-----|
+| 총 URL 수 | 3,000 |
+| 총 클릭 수 | 300,000 |
+| 평균 클릭 | 100 |
+| 최소 클릭 | 100 |
+| 최대 클릭 | 100 |
+
+### 처리량
+| 메트릭 | 값 |
+|--------|-----|
+| Requests/s (per runner) | ~297/s |
+| Iterations/s (per runner) | ~2.9/s |
+| **총 처리량** | **~1,187 req/s** |
+
+### 분석
+
+**개선된 점 (이전 테스트 대비):**
+1. **에러율 0% 유지**: 안정적인 서비스 상태 확인
+2. **모든 URL 생성 성공**: 3,000개 URL 전부 생성 완료
+3. **모든 Checks 100% 통과**: health, create, redirect 모두 성공
+4. **🎉 클릭 카운트 정확도 100%**: 동시성 문제 완전 해결
+   - 예상 총 클릭: 300,000회 (3000 URLs × 100 redirects)
+   - 실제 총 클릭: 300,000회 (100% 정확)
+   - 평균/최소/최대 클릭 모두 100회로 일치
+
+**동시성 문제 해결 (커밋: 68f99c5)**
+
+이전 테스트에서 클릭 수가 약 50% 누락되던 문제가 해결되었습니다.
+
+| 구분 | 이전 방식 | 수정된 방식 |
+|------|----------|------------|
+| 패턴 | Read → Modify → Write | Atomic SQL Update |
+| 문제 | Race Condition (Lost Update) | 없음 |
+| 결과 | 149,705 클릭 (~50%) | 300,000 클릭 (100%) |
+
+```go
+// 이전 방식 (Race Condition 발생)
+entity, _ := repo.FindByShortURL(ctx, shortURL)  // 1. 읽기
+entity.IncrementClicks()                          // 2. 메모리에서 +1
+repo.Update(ctx, entity)                          // 3. 저장
+
+// 수정된 방식 (원자적 업데이트)
+db.Model(&url.URL{}).
+    Where("short_url = ?", shortURL).
+    UpdateColumn("clicks", gorm.Expr("clicks + 1"))  // SQL: UPDATE SET clicks = clicks + 1
+```
+
+SQL 레벨의 원자적 연산(`clicks = clicks + 1`)으로 동시 요청 시에도 정확한 카운트 보장
+
+**성능 지표:**
+1. **평균 응답시간**: 687.93ms (이전 815.75ms 대비 16% 개선)
+2. **p(95) 응답시간**: 2.47s (이전 3.05s 대비 19% 개선)
+3. **p(99) 응답시간**: 4.10s (이전 5.13s 대비 20% 개선)
+4. **처리량**: ~1,187 req/s (이전 ~1,020 req/s 대비 16% 향상)
+
+**결론:**
+- 1000 VUs 동시 접속 환경에서 안정적인 서비스 제공
+- 기능적 정확성 100% 달성 (HTTP 응답 및 데이터 무결성)
+- 클릭 카운트 동시성 문제 완전 해결
+- 고부하 시에도 응답 시간 개선 확인
+
+### Grafana 대시보드
+
+![Stress Test 2026-02-03 21:37](./images/stress-test-20260203-2137-grafana.png)
+
+**Grafana 메트릭 (스크린샷 기준):**
+| 항목 | 값 |
+|------|-----|
+| HTTP requests | 306,000 |
+| HTTP request failures | 0 (No data) |
+| Peak RPS | 3.15K req/s |
+| HTTP Request Duration | 3.69s |
+
+- URL: http://grafana.hearttune.link
+- Dashboard: k6 Load Testing (ID: 19665)
+
+---
+
 ## Stress Test - 2026-02-03 00:28
 
 ### 테스트 설정

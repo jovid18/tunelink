@@ -359,6 +359,74 @@ func connectDB() *gorm.DB {
 
 ---
 
+### 클릭 카운트 동시성 문제 (Race Condition)
+
+**날짜:** 2026-02-03
+
+**증상:**
+
+- Stress Test에서 클릭 수가 예상의 약 50%만 기록됨
+- 예상: 300,000 클릭 (3,000 URLs × 100 redirects)
+- 실제: 149,705 클릭 (~50%)
+- 평균/최소/최대 클릭 수가 불균일 (avg: 49.9, min: 24, max: 86)
+
+**원인:**
+
+- Read → Modify → Write 패턴의 Race Condition (Lost Update)
+- 동시 요청 시 여러 고루틴이 같은 값을 읽고 각각 +1 후 저장
+- 결과적으로 일부 증가분 손실
+
+**문제 코드:**
+
+```go
+// usecase.go - 이전 방식
+func (uc *urlUseCase) incrementClicks(shortURL string) {
+    ctx := context.Background()
+    entity, err := uc.repo.FindByShortURL(ctx, shortURL)  // 1. 읽기: clicks=50
+    if err != nil {
+        return
+    }
+    entity.IncrementClicks()                              // 2. 메모리에서 +1: clicks=51
+    uc.repo.Update(ctx, entity)                           // 3. 저장: clicks=51
+}
+// 동시에 10개 요청이 오면 모두 clicks=50을 읽고 51로 저장 → 9개 손실
+```
+
+**해결 방법:**
+
+- SQL 레벨의 원자적 업데이트 사용 (커밋: 68f99c5)
+
+```go
+// url_repository.go - 수정된 방식
+func (r *URLRepository) IncrementClicks(ctx context.Context, shortURL string) error {
+    return r.db.WithContext(ctx).
+        Model(&url.URL{}).
+        Where("short_url = ?", shortURL).
+        UpdateColumn("clicks", gorm.Expr("clicks + 1")).Error
+        // SQL: UPDATE urls SET clicks = clicks + 1 WHERE short_url = ?
+        // DB 레벨에서 원자적으로 처리되어 Lost Update 방지
+}
+```
+
+**적용 결과 (2026-02-03 Stress Test):**
+
+| 지표 | 적용 전 | 적용 후 |
+|------|--------|--------|
+| 예상 클릭 | 300,000 | 300,000 |
+| 실제 클릭 | 149,705 (~50%) | 300,000 (100%) |
+| 평균 클릭 | 49.9 | 100 |
+| 최소/최대 | 24 / 86 | 100 / 100 |
+
+**핵심 포인트:**
+
+- 동시성 환경에서 카운터 증가는 반드시 **원자적 연산** 사용
+- `SELECT → UPDATE`가 아닌 `UPDATE ... SET col = col + 1` 패턴
+- 대안: Redis INCR, PostgreSQL RETURNING, DB Lock 등
+
+**상세 결과:** [test-result.md](./test-result.md)
+
+---
+
 ### k6 부하테스트 Pod 스케줄링 실패 (Too many pods)
 
 **날짜:** 2025-01-25
