@@ -2,7 +2,7 @@
 
 ## 현재 인프라 현황
 - **클라우드**: AWS (ap-northeast-2)
-- **K8s**: EKS 1.29 (SPOT 인스턴스, 1~3 노드)
+- **K8s**: EKS 1.33 (SPOT 인스턴스, 2~4 노드)
 - **서비스**: API(2 replicas), Web(2 replicas)
 - **DB**: RDS MySQL 8.0 (db.t3.micro)
 - **모니터링**: Prometheus + Grafana (Terraform 모듈로 관리)

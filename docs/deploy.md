@@ -391,20 +391,20 @@ aws rds describe-db-instances --query 'DBInstances[*].[DBInstanceIdentifier,Endp
 
 ---
 
-#### 4.4 ElastiCache 모듈 (Redis) - ⏸️ SKIP
+#### 4.4 ElastiCache 모듈 (Redis) - ✅ 완료
 
 **목적:** Redis 캐시 생성
 
-> **2026-01-23: 일단 스킵**
-> - API 코드가 Redis 없이도 동작하도록 설계됨 (캐시 미스 시 DB fallback)
-> - dev 환경에서는 트래픽이 적어 캐시 불필요
-> - 필요 시 나중에 추가 가능 (cache.t3.micro 프리티어 무료)
+> **2026-02-03: 구현 완료**
+> - URL 조회 캐싱으로 DB 부하 감소
+> - 클릭 수 증가를 Redis INCR로 처리 후 배치 동기화
+> - Stress Test에서 93.5% 응답시간 개선 확인
 
-- [ ] `infra/terraform/modules/elasticache/main.tf` 작성
-- [ ] `infra/terraform/modules/elasticache/variables.tf` 작성
-- [ ] `infra/terraform/modules/elasticache/outputs.tf` 작성
-- [ ] dev 환경에서 ElastiCache 모듈 호출 추가
-- [ ] `terraform apply` 로 ElastiCache 생성 확인
+- [x] `infra/terraform/modules/elasticache/main.tf` 작성
+- [x] `infra/terraform/modules/elasticache/variables.tf` 작성
+- [x] `infra/terraform/modules/elasticache/outputs.tf` 작성
+- [x] dev 환경에서 ElastiCache 모듈 호출 추가
+- [x] `terraform apply` 로 ElastiCache 생성 확인
 
 **ElastiCache 설정:**
 ```
@@ -718,11 +718,11 @@ echo | openssl s_client -servername hearttune.link -connect hearttune.link:443 2
 > - Grafana 연동 최적화 (같은 회사 제품)
 > - K8s CRD로 테스트 정의 → GitOps 친화적
 
-- [ ] `infra/terraform/modules/k6_operator/main.tf` 작성
-- [ ] `infra/terraform/modules/k6_operator/variables.tf` 작성
-- [ ] `infra/terraform/modules/k6_operator/outputs.tf` 작성
-- [ ] dev 환경에서 k6-operator 모듈 호출 추가
-- [ ] `terraform apply` 로 설치 확인
+- [x] `infra/terraform/modules/k6_operator/main.tf` 작성
+- [x] `infra/terraform/modules/k6_operator/variables.tf` 작성
+- [x] `infra/terraform/modules/k6_operator/outputs.tf` 작성
+- [x] dev 환경에서 k6-operator 모듈 호출 추가
+- [x] `terraform apply` 로 설치 확인
 
 **k6-operator 설정:**
 ```
@@ -824,10 +824,10 @@ export default function () {
 
 ### Step 5: 전체 배포 테스트
 
-- [ ] 커스텀 도메인 접속 확인: `https://hearttune.link`
-- [ ] API health check 확인: `curl https://hearttune.link/health`
-- [ ] URL 단축 기능 테스트
-- [ ] 리다이렉트 기능 테스트
+- [x] 커스텀 도메인 접속 확인: `https://hearttune.link`
+- [x] API health check 확인: `curl https://hearttune.link/health`
+- [x] URL 단축 기능 테스트
+- [x] 리다이렉트 기능 테스트
 
 ---
 

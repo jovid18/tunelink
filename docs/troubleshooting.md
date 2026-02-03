@@ -4,7 +4,7 @@
 
 ### Security Group Rule이 apply할 때마다 재생성되는 문제
 
-**날짜:** 2025-01-25
+**날짜:** 2026-01-25
 
 **증상:**
 
@@ -68,7 +68,7 @@ resource "aws_security_group_rule" "rds_ingress_vpc" {
 
 ### Security Group Rule 분리 후 InvalidPermission.Duplicate 에러
 
-**날짜:** 2025-01-25
+**날짜:** 2026-01-25
 
 **증상:**
 
@@ -116,7 +116,7 @@ terraform plan
 
 ### Bastion Host IP가 재시작 시 변경되는 문제
 
-**날짜:** 2025-02-01
+**날짜:** 2026-02-01
 
 **증상:**
 
@@ -180,7 +180,7 @@ terraform apply -target=module.bastion
 
 ### k6-operator Helm 설치 시 Namespace 충돌
 
-**날짜:** 2025-01-25
+**날짜:** 2026-01-25
 
 **증상:**
 
@@ -427,9 +427,72 @@ func (r *URLRepository) IncrementClicks(ctx context.Context, shortURL string) er
 
 ---
 
+### Redis 캐시 통합 및 클릭 수 동기화
+
+**날짜:** 2026-02-03
+
+**배경:**
+
+- DB 직접 조회 방식의 응답시간이 고부하 시 급격히 증가 (avg 687ms)
+- 클릭 수 증가를 DB 원자적 업데이트로 처리해도 DB 부하 발생
+- Redis 캐시 도입으로 성능 개선 필요
+
+**구현 내용 (커밋: 339aac5, 0b67b36):**
+
+1. **URL 조회 캐싱**
+   - Redis에 URL 정보 캐싱 (TTL: 1시간)
+   - 캐시 히트 시 DB 조회 스킵
+   - 캐시 미스 시 DB 조회 후 캐싱
+
+2. **클릭 수 Redis INCR + 배치 동기화**
+   - 클릭 발생 시 Redis `INCR` (원자적, 빠름)
+   - 백그라운드 워커가 주기적으로 DB 동기화
+   - DB 부하 분산 + 정확성 보장
+
+**아키텍처:**
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│   Client    │────▶│    API      │────▶│   Redis     │
+└─────────────┘     └──────┬──────┘     └──────┬──────┘
+                           │                    │
+                           │ cache miss         │ INCR clicks
+                           ▼                    │
+                    ┌─────────────┐             │
+                    │    MySQL    │◀────────────┘
+                    │    (RDS)    │    batch sync
+                    └─────────────┘
+```
+
+**성능 개선 결과 (Stress Test 1000 VUs):**
+
+| 지표 | Redis 도입 전 | Redis 도입 후 | 개선율 |
+|------|-------------|--------------|--------|
+| 평균 응답시간 | 687.93ms | 44.71ms | **-93.5%** |
+| p(95) 응답시간 | 2.47s | 109.46ms | **-95.6%** |
+| 처리량 | ~1,187 req/s | ~6,504 req/s | **+448%** |
+
+**주의사항:**
+
+1. **Redis 연결 실패 시**: DB fallback으로 서비스 지속 (graceful degradation)
+2. **동기화 지연**: 클릭 수가 실시간이 아닌 배치로 DB에 반영됨
+3. **캐시 무효화**: URL 수정 시 캐시 삭제 필요
+
+**Redis 연결 확인:**
+
+```bash
+# EKS Pod에서 Redis 연결 테스트
+kubectl run -it --rm redis-test --image=redis:7 -n tunelink -- \
+  redis-cli -h tunelink-dev-redis.6d5ed3.0001.apn2.cache.amazonaws.com ping
+```
+
+**상세 결과:** [test-result.md](./test-result.md)
+
+---
+
 ### k6 부하테스트 Pod 스케줄링 실패 (Too many pods)
 
-**날짜:** 2025-01-25
+**날짜:** 2026-01-25
 
 **증상:**
 
