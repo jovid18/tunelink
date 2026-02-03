@@ -37,6 +37,13 @@ func (r *URLRepository) Update(ctx context.Context, entity *url.URL) error {
 	return r.db.WithContext(ctx).Save(entity).Error
 }
 
+func (r *URLRepository) IncrementClicks(ctx context.Context, shortURL string) error {
+	return r.db.WithContext(ctx).
+		Model(&url.URL{}).
+		Where("short_url = ?", shortURL).
+		UpdateColumn("clicks", gorm.Expr("clicks + 1")).Error
+}
+
 // IsDuplicateKeyError checks if the error is a MySQL duplicate key error
 func IsDuplicateKeyError(err error) bool {
 	if err == nil {

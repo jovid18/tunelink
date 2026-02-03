@@ -13,6 +13,7 @@ type Repository interface {
 	Save(ctx context.Context, url *URL) error
 	FindByShortURL(ctx context.Context, shortURL string) (*URL, error)
 	Update(ctx context.Context, url *URL) error
+	IncrementClicks(ctx context.Context, shortURL string) error
 }
 
 // Cache defines the outbound port for URL caching

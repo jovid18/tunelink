@@ -10,9 +10,10 @@ import (
 
 // Mock Repository
 type mockRepository struct {
-	saveFunc          func(ctx context.Context, entity *url.URL) error
-	findByShortURLFunc func(ctx context.Context, shortURL string) (*url.URL, error)
-	updateFunc        func(ctx context.Context, entity *url.URL) error
+	saveFunc            func(ctx context.Context, entity *url.URL) error
+	findByShortURLFunc  func(ctx context.Context, shortURL string) (*url.URL, error)
+	updateFunc          func(ctx context.Context, entity *url.URL) error
+	incrementClicksFunc func(ctx context.Context, shortURL string) error
 }
 
 func (m *mockRepository) Save(ctx context.Context, entity *url.URL) error {
@@ -32,6 +33,13 @@ func (m *mockRepository) FindByShortURL(ctx context.Context, shortURL string) (*
 func (m *mockRepository) Update(ctx context.Context, entity *url.URL) error {
 	if m.updateFunc != nil {
 		return m.updateFunc(ctx, entity)
+	}
+	return nil
+}
+
+func (m *mockRepository) IncrementClicks(ctx context.Context, shortURL string) error {
+	if m.incrementClicksFunc != nil {
+		return m.incrementClicksFunc(ctx, shortURL)
 	}
 	return nil
 }

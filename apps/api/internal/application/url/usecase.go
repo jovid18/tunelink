@@ -69,21 +69,14 @@ func (uc *urlUseCase) ResolveShortURL(ctx context.Context, shortURL string) (str
 	// Update cache
 	_ = uc.cache.Set(ctx, shortURL, entity.OriginalURL)
 
-	// Increment clicks using domain method
-	entity.IncrementClicks()
-	go uc.repo.Update(context.Background(), entity)
+	// Increment clicks atomically
+	go uc.incrementClicks(shortURL)
 
 	return entity.OriginalURL, nil
 }
 
 func (uc *urlUseCase) incrementClicks(shortURL string) {
-	ctx := context.Background()
-	entity, err := uc.repo.FindByShortURL(ctx, shortURL)
-	if err != nil {
-		return
-	}
-	entity.IncrementClicks()
-	uc.repo.Update(ctx, entity)
+	uc.repo.IncrementClicks(context.Background(), shortURL)
 }
 
 func generateRandomString(length int) string {
