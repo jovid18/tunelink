@@ -31,6 +31,12 @@ output "rds_address" {
   value       = module.rds.address
 }
 
+# ElastiCache Outputs
+output "redis_endpoint" {
+  description = "Redis endpoint"
+  value       = module.elasticache.endpoint
+}
+
 # EKS Outputs
 output "eks_cluster_name" {
   description = "EKS cluster name"

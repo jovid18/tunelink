@@ -1,6 +1,7 @@
 package infrastructure
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -16,9 +17,10 @@ import (
 )
 
 type Config struct {
-	DB      *gorm.DB
-	Redis   *redis.Client
-	BaseURL string
+	DB           *gorm.DB
+	Redis        *redis.Client
+	RedisEnabled bool
+	BaseURL      string
 }
 
 func Load() *Config {
@@ -26,13 +28,14 @@ func Load() *Config {
 	_ = godotenv.Load()
 
 	db := connectDB()
-	rdb := connectRedis()
+	rdb, redisEnabled := connectRedis()
 	baseURL := mustGetEnv("BASE_URL")
 
 	return &Config{
-		DB:      db,
-		Redis:   rdb,
-		BaseURL: baseURL,
+		DB:           db,
+		Redis:        rdb,
+		RedisEnabled: redisEnabled,
+		BaseURL:      baseURL,
 	}
 }
 
@@ -71,16 +74,29 @@ func connectDB() *gorm.DB {
 	return db
 }
 
-func connectRedis() *redis.Client {
-	host := getEnv("REDIS_HOST", "localhost")
-	port := getEnv("REDIS_PORT", "6379")
+func connectRedis() (*redis.Client, bool) {
+	host := getEnv("REDIS_HOST", "")
+	if host == "" {
+		log.Println("REDIS_HOST not set, Redis disabled")
+		return nil, false
+	}
 
+	port := getEnv("REDIS_PORT", "6379")
 	rdb := redis.NewClient(&redis.Options{
 		Addr: fmt.Sprintf("%s:%s", host, port),
 	})
 
+	// Verify connection with ping
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := rdb.Ping(ctx).Err(); err != nil {
+		log.Printf("Redis connection failed: %v, Redis disabled", err)
+		return nil, false
+	}
+
 	log.Println("Connected to Redis")
-	return rdb
+	return rdb, true
 }
 
 func getEnv(key, defaultValue string) string {

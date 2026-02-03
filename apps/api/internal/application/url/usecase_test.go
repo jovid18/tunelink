@@ -10,10 +10,11 @@ import (
 
 // Mock Repository
 type mockRepository struct {
-	saveFunc            func(ctx context.Context, entity *url.URL) error
-	findByShortURLFunc  func(ctx context.Context, shortURL string) (*url.URL, error)
-	updateFunc          func(ctx context.Context, entity *url.URL) error
-	incrementClicksFunc func(ctx context.Context, shortURL string) error
+	saveFunc              func(ctx context.Context, entity *url.URL) error
+	findByShortURLFunc    func(ctx context.Context, shortURL string) (*url.URL, error)
+	updateFunc            func(ctx context.Context, entity *url.URL) error
+	incrementClicksFunc   func(ctx context.Context, shortURL string) error
+	incrementClicksByFunc func(ctx context.Context, shortURL string, count int64) error
 }
 
 func (m *mockRepository) Save(ctx context.Context, entity *url.URL) error {
@@ -44,10 +45,20 @@ func (m *mockRepository) IncrementClicks(ctx context.Context, shortURL string) e
 	return nil
 }
 
+func (m *mockRepository) IncrementClicksBy(ctx context.Context, shortURL string, count int64) error {
+	if m.incrementClicksByFunc != nil {
+		return m.incrementClicksByFunc(ctx, shortURL, count)
+	}
+	return nil
+}
+
 // Mock Cache
 type mockCache struct {
-	getFunc func(ctx context.Context, shortURL string) (string, error)
-	setFunc func(ctx context.Context, shortURL, originalURL string) error
+	getFunc               func(ctx context.Context, shortURL string) (string, error)
+	setFunc               func(ctx context.Context, shortURL, originalURL string) error
+	incrementClickFunc    func(ctx context.Context, shortURL string) (int64, error)
+	getAllClickCountsFunc func(ctx context.Context) (map[string]int64, error)
+	resetClickCountFunc   func(ctx context.Context, shortURL string) error
 }
 
 func (m *mockCache) Get(ctx context.Context, shortURL string) (string, error) {
@@ -60,6 +71,27 @@ func (m *mockCache) Get(ctx context.Context, shortURL string) (string, error) {
 func (m *mockCache) Set(ctx context.Context, shortURL, originalURL string) error {
 	if m.setFunc != nil {
 		return m.setFunc(ctx, shortURL, originalURL)
+	}
+	return nil
+}
+
+func (m *mockCache) IncrementClick(ctx context.Context, shortURL string) (int64, error) {
+	if m.incrementClickFunc != nil {
+		return m.incrementClickFunc(ctx, shortURL)
+	}
+	return 0, errors.New("cache miss")
+}
+
+func (m *mockCache) GetAllClickCounts(ctx context.Context) (map[string]int64, error) {
+	if m.getAllClickCountsFunc != nil {
+		return m.getAllClickCountsFunc(ctx)
+	}
+	return make(map[string]int64), nil
+}
+
+func (m *mockCache) ResetClickCount(ctx context.Context, shortURL string) error {
+	if m.resetClickCountFunc != nil {
+		return m.resetClickCountFunc(ctx, shortURL)
 	}
 	return nil
 }

@@ -76,7 +76,13 @@ func (uc *urlUseCase) ResolveShortURL(ctx context.Context, shortURL string) (str
 }
 
 func (uc *urlUseCase) incrementClicks(shortURL string) {
-	uc.repo.IncrementClicks(context.Background(), shortURL)
+	ctx := context.Background()
+	// Try Redis first (fast path)
+	if _, err := uc.cache.IncrementClick(ctx, shortURL); err == nil {
+		return
+	}
+	// Fallback to direct DB update (slow path)
+	uc.repo.IncrementClicks(ctx, shortURL)
 }
 
 func generateRandomString(length int) string {

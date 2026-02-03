@@ -11,9 +11,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 	httpAdapter "github.com/tunelink/api/internal/adapter/in/http"
+	noopAdapter "github.com/tunelink/api/internal/adapter/out/cache/noop"
 	redisAdapter "github.com/tunelink/api/internal/adapter/out/cache/redis"
 	mysqlAdapter "github.com/tunelink/api/internal/adapter/out/persistence/mysql"
+	"github.com/tunelink/api/internal/application/sync"
 	urlApp "github.com/tunelink/api/internal/application/url"
+	urlDomain "github.com/tunelink/api/internal/domain/url"
 	"github.com/tunelink/api/internal/infrastructure"
 )
 
@@ -22,10 +25,26 @@ func main() {
 
 	// Initialize adapters (outbound)
 	urlRepo := mysqlAdapter.NewURLRepository(cfg.DB)
-	urlCache := redisAdapter.NewURLCache(cfg.Redis)
+
+	// Initialize cache (Redis or Noop fallback)
+	var urlCache urlDomain.Cache
+	if cfg.RedisEnabled {
+		urlCache = redisAdapter.NewURLCache(cfg.Redis)
+		log.Println("Using Redis cache")
+	} else {
+		urlCache = noopAdapter.NewURLCache()
+		log.Println("Redis disabled, using noop cache")
+	}
 
 	// Initialize use cases (application)
 	urlUseCase := urlApp.NewURLUseCase(urlRepo, urlCache)
+
+	// Start click sync service (only if Redis is enabled)
+	var clickSync *sync.ClickSyncService
+	if cfg.RedisEnabled {
+		clickSync = sync.NewClickSyncService(urlRepo, urlCache, 10*time.Second)
+		clickSync.Start()
+	}
 
 	// Initialize handlers (inbound adapters)
 	urlHandler := httpAdapter.NewURLHandler(urlUseCase, cfg.BaseURL)
@@ -77,6 +96,11 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 	log.Println("Shutting down server...")
+
+	// Stop click sync first (performs final sync)
+	if clickSync != nil {
+		clickSync.Stop()
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

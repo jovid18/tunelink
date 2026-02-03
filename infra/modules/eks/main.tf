@@ -83,7 +83,7 @@ resource "aws_eks_cluster" "main" {
     subnet_ids              = var.private_subnet_ids
     security_group_ids      = [aws_security_group.eks_cluster.id]
     endpoint_private_access = true
-    endpoint_public_access  = true  # kubectl 접근용
+    endpoint_public_access  = true # kubectl 접근용
   }
 
   depends_on = [

@@ -130,9 +130,9 @@ resource "helm_release" "prometheus_stack" {
         # k6 대시보드 sidecar 설정 (ConfigMap에서 자동 로드)
         sidecar = {
           dashboards = {
-            enabled = true
-            label   = "grafana_dashboard"
-            folder  = "/tmp/dashboards"
+            enabled         = true
+            label           = "grafana_dashboard"
+            folder          = "/tmp/dashboards"
             searchNamespace = local.namespace
           }
         }
@@ -152,7 +152,7 @@ resource "kubernetes_config_map" "k6_dashboard" {
     namespace = kubernetes_namespace.monitoring.metadata[0].name
 
     labels = {
-      grafana_dashboard = "1"  # sidecar가 이 label을 감지
+      grafana_dashboard = "1" # sidecar가 이 label을 감지
     }
   }
 

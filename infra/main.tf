@@ -26,7 +26,7 @@ module "rds" {
   private_subnet_ids = module.vpc.private_subnet_ids
   db_username        = var.db_username
   db_password        = var.db_password
-  instance_class     = "db.t3.micro"  # 프리티어
+  instance_class     = "db.t3.micro" # 프리티어
 }
 
 # Bastion Host (for DB access)
@@ -43,8 +43,16 @@ module "bastion" {
   depends_on = [module.rds]
 }
 
-# ElastiCache - SKIP (Redis 없이도 API 동작함)
-# module "elasticache" { ... }
+# ElastiCache (Redis)
+module "elasticache" {
+  source = "./modules/elasticache"
+
+  project_name       = var.project_name
+  environment        = var.environment
+  vpc_id             = module.vpc.vpc_id
+  private_subnet_ids = module.vpc.private_subnet_ids
+  node_type          = "cache.t3.micro"
+}
 
 # EKS
 module "eks" {
@@ -64,7 +72,7 @@ module "eks" {
 
   # Loadtest 노드 (테스트 시에만 활성화)
   loadtest_node_enabled      = true
-  loadtest_node_desired_size = 0  # 0 = 꺼짐, 1 = 켜짐
+  loadtest_node_desired_size = 0 # 0 = 꺼짐, 1 = 켜짐
 }
 
 # AWS Load Balancer Controller
@@ -95,11 +103,11 @@ module "k8s_base" {
   db_username = var.db_username
   db_password = var.db_password
 
-  # Redis - 현재 미사용
-  redis_host = ""
+  # Redis
+  redis_host = module.elasticache.endpoint
   redis_port = "6379"
 
-  depends_on = [module.alb_controller]
+  depends_on = [module.alb_controller, module.elasticache]
 }
 
 # Kubernetes API Deployment
