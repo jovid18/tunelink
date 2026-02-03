@@ -62,7 +62,7 @@ func (s *ClickSyncService) syncClicks() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	// Get all click counts from Redis
+	// Get all click keys from Redis
 	counts, err := s.cache.GetAllClickCounts(ctx)
 	if err != nil {
 		log.Printf("Failed to get click counts from Redis: %v", err)
@@ -74,20 +74,22 @@ func (s *ClickSyncService) syncClicks() {
 	}
 
 	synced := 0
-	for shortURL, count := range counts {
-		if count == 0 {
+	for shortURL := range counts {
+		// Atomically get and delete (GETDEL) - no race condition
+		count, err := s.cache.GetAndDeleteClickCount(ctx, shortURL)
+		if err != nil || count == 0 {
 			continue
 		}
 
-		// Batch update to MySQL (increment by count)
-		err := s.repo.IncrementClicksBy(ctx, shortURL, count)
+		// Update MySQL
+		err = s.repo.IncrementClicksBy(ctx, shortURL, count)
 		if err != nil {
 			log.Printf("Failed to sync clicks for %s: %v", shortURL, err)
+			// Note: clicks are lost if MySQL fails after GETDEL
+			// For production, consider a recovery mechanism
 			continue
 		}
 
-		// Reset Redis counter after successful sync
-		_ = s.cache.ResetClickCount(ctx, shortURL)
 		synced++
 	}
 

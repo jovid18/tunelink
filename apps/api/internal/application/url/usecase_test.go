@@ -54,11 +54,13 @@ func (m *mockRepository) IncrementClicksBy(ctx context.Context, shortURL string,
 
 // Mock Cache
 type mockCache struct {
-	getFunc               func(ctx context.Context, shortURL string) (string, error)
-	setFunc               func(ctx context.Context, shortURL, originalURL string) error
-	incrementClickFunc    func(ctx context.Context, shortURL string) (int64, error)
-	getAllClickCountsFunc func(ctx context.Context) (map[string]int64, error)
-	resetClickCountFunc   func(ctx context.Context, shortURL string) error
+	getFunc                    func(ctx context.Context, shortURL string) (string, error)
+	setFunc                    func(ctx context.Context, shortURL, originalURL string) error
+	incrementClickFunc         func(ctx context.Context, shortURL string) (int64, error)
+	getAllClickCountsFunc      func(ctx context.Context) (map[string]int64, error)
+	resetClickCountFunc        func(ctx context.Context, shortURL string) error
+	getAndDeleteClickCountFunc func(ctx context.Context, shortURL string) (int64, error)
+	clearAllFunc               func(ctx context.Context) (int64, error)
 }
 
 func (m *mockCache) Get(ctx context.Context, shortURL string) (string, error) {
@@ -94,6 +96,20 @@ func (m *mockCache) ResetClickCount(ctx context.Context, shortURL string) error 
 		return m.resetClickCountFunc(ctx, shortURL)
 	}
 	return nil
+}
+
+func (m *mockCache) GetAndDeleteClickCount(ctx context.Context, shortURL string) (int64, error) {
+	if m.getAndDeleteClickCountFunc != nil {
+		return m.getAndDeleteClickCountFunc(ctx, shortURL)
+	}
+	return 0, errors.New("not found")
+}
+
+func (m *mockCache) ClearAll(ctx context.Context) (int64, error) {
+	if m.clearAllFunc != nil {
+		return m.clearAllFunc(ctx)
+	}
+	return 0, nil
 }
 
 func TestCreateShortURL_Success(t *testing.T) {

@@ -48,7 +48,7 @@ func main() {
 
 	// Initialize handlers (inbound adapters)
 	urlHandler := httpAdapter.NewURLHandler(urlUseCase, cfg.BaseURL)
-	testHandler := httpAdapter.NewTestHandler(cfg.DB)
+	testHandler := httpAdapter.NewTestHandler(cfg.DB, urlCache)
 
 	// Setup router
 	r := gin.Default()

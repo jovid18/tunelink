@@ -25,4 +25,7 @@ type Cache interface {
 	IncrementClick(ctx context.Context, shortURL string) (int64, error)
 	GetAllClickCounts(ctx context.Context) (map[string]int64, error)
 	ResetClickCount(ctx context.Context, shortURL string) error
+	GetAndDeleteClickCount(ctx context.Context, shortURL string) (int64, error)
+	// Clear operations (for testing)
+	ClearAll(ctx context.Context) (int64, error)
 }

@@ -37,3 +37,11 @@ func (c *URLCache) GetAllClickCounts(ctx context.Context) (map[string]int64, err
 func (c *URLCache) ResetClickCount(ctx context.Context, shortURL string) error {
 	return nil
 }
+
+func (c *URLCache) GetAndDeleteClickCount(ctx context.Context, shortURL string) (int64, error) {
+	return 0, ErrCacheMiss
+}
+
+func (c *URLCache) ClearAll(ctx context.Context) (int64, error) {
+	return 0, nil
+}
