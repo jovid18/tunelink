@@ -2,11 +2,11 @@
 
 ## 서비스 개요
 
-| 항목 | 결정 |
-|------|------|
-| 서비스 | URL Shortener (링크 단축 서비스) |
-| 인증 | 없음 (MVP 단계) |
-| 진행 방식 | 로컬 개발환경 먼저 → AWS 배포 |
+| 항목      | 결정                             |
+| --------- | -------------------------------- |
+| 서비스    | URL Shortener (링크 단축 서비스) |
+| 인증      | 없음 (MVP 단계)                  |
+| 진행 방식 | 로컬 개발환경 먼저 → AWS 배포    |
 
 ### 핵심 기능 (MVP)
 
@@ -16,11 +16,11 @@
 
 ### API 엔드포인트
 
-| Method | Path | 설명 |
-|--------|------|------|
-| GET | `/health` | 헬스체크 |
-| POST | `/api/urls` | URL 단축 생성 |
-| GET | `/r/{shortUrl}` | 리다이렉트 |
+| Method | Path            | 설명          |
+| ------ | --------------- | ------------- |
+| GET    | `/health`       | 헬스체크      |
+| POST   | `/api/urls`     | URL 단축 생성 |
+| GET    | `/r/{shortUrl}` | 리다이렉트    |
 
 ### DB 스키마
 
@@ -37,16 +37,16 @@
 
 ## 기술 스택
 
-| 영역 | 기술 |
-|------|------|
-| Backend | Go + Gin |
-| Frontend | React + Vite |
-| Database | MySQL |
-| Cache | Redis |
-| Container | Docker |
-| Orchestration | Kubernetes (EKS) |
-| IaC | Terraform (Helm 없음) |
-| CI/CD | GitHub Actions |
+| 영역          | 기술                  |
+| ------------- | --------------------- |
+| Backend       | Go + Gin              |
+| Frontend      | React + Vite          |
+| Database      | MySQL                 |
+| Cache         | Redis                 |
+| Container     | Docker                |
+| Orchestration | Kubernetes (EKS)      |
+| IaC           | Terraform (Helm 없음) |
+| CI/CD         | GitHub Actions        |
 
 ---
 
@@ -168,6 +168,7 @@ tunelink/
 ```
 
 **의존성 그래프:**
+
 ```
 VPC ─┬─→ RDS
      ├─→ ElastiCache
@@ -180,7 +181,8 @@ VPC ─┬─→ RDS
 
 ### Phase 3: CI/CD 파이프라인
 
-#### API 변경 시 (apps/api/**)
+#### API 변경 시 (apps/api/\*\*)
+
 ```
 Push → GitHub Actions
          │
@@ -191,7 +193,8 @@ Push → GitHub Actions
              └── k8s_api 모듈 (image_tag 변수 업데이트)
 ```
 
-#### Web 변경 시 (apps/web/**)
+#### Web 변경 시 (apps/web/\*\*)
+
 ```
 Push → GitHub Actions
          │
@@ -202,7 +205,8 @@ Push → GitHub Actions
              └── k8s_web 모듈 (image_tag 변수 업데이트)
 ```
 
-#### Infra 변경 시 (infra/**)
+#### Infra 변경 시 (infra/\*\*)
+
 ```
 Push → GitHub Actions
          │
@@ -251,6 +255,7 @@ example.com/api/*     → API Service (Go)
 ```
 
 **Terraform 리소스 예시:**
+
 ```hcl
 resource "kubernetes_ingress_v1" "main" {
   metadata {
@@ -291,72 +296,3 @@ resource "kubernetes_ingress_v1" "main" {
   }
 }
 ```
-
----
-
-## 개발 순서 (권장)
-
-### Step 1: 앱 개발 (로컬)
-- [ ] Go API 기본 구조 (health check, CORS)
-- [ ] MySQL 스키마 설계 & 마이그레이션
-- [ ] React 기본 구조
-- [ ] docker-compose로 로컬 통합 테스트
-
-### Step 2: 컨테이너화
-- [ ] API Dockerfile 작성
-- [ ] Web Dockerfile 작성 (nginx)
-- [ ] 로컬에서 컨테이너 빌드/실행 테스트
-
-### Step 3: Terraform 모듈 개발
-- [ ] VPC 모듈
-- [ ] ECR 모듈
-- [ ] RDS 모듈
-- [ ] ElastiCache 모듈
-- [ ] EKS 모듈
-- [ ] ALB Controller 모듈
-- [ ] K8s 모듈 (base, api, web)
-
-### Step 4: 수동 배포 테스트
-- [ ] ECR에 이미지 푸시
-- [ ] terraform apply로 전체 인프라 + 앱 배포
-- [ ] 동작 확인
-
-### Step 5: CI/CD 구축
-- [ ] GitHub Actions 워크플로우 작성
-- [ ] PR 시 plan, merge 시 apply 자동화
-
----
-
-## 환경 변수 / 시크릿 관리
-
-| 항목 | 저장 위치 | K8s 주입 방식 |
-|------|----------|--------------|
-| DB Host/Port | Terraform output | ConfigMap |
-| DB User/Password | AWS Secrets Manager | External Secrets 또는 Terraform kubernetes_secret |
-| Redis Host/Port | Terraform output | ConfigMap |
-| API URL (for Web) | 빌드 시 주입 | Vite env |
-
----
-
-## 예상 비용 (dev 환경 기준)
-
-| 리소스 | 스펙 | 월 예상 |
-|--------|------|---------|
-| EKS Control Plane | - | ~$73 |
-| EKS Node (t3.medium x2) | 2 vCPU, 4GB | ~$60 |
-| RDS (db.t3.micro) | 1 vCPU, 1GB | ~$15 |
-| ElastiCache (cache.t3.micro) | 1 vCPU, 0.5GB | ~$12 |
-| ALB | - | ~$20 |
-| NAT Gateway | - | ~$32 |
-| ECR | 저장량에 따라 | ~$1 |
-| **합계** | | **~$213/월** |
-
-> 비용 절감 팁: dev는 NAT Gateway 대신 NAT Instance, 또는 Public Subnet에 노드 배치 고려
-
----
-
-## 다음 단계
-
-1. 이 구조 확정되면 → 폴더/파일 생성
-2. Phase 1부터 순차적으로 진행
-3. 각 단계별로 PR + 리뷰
