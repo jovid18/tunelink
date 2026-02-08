@@ -4,8 +4,6 @@
 
 ![Demo](docs/images/tunelink.gif)
 
-**Live Demo:** https://hearttune.link
-
 ## Architecture
 
 ![AWS Architecture](docs/images/tunelink-architecture.png)
@@ -14,12 +12,12 @@
 
 ## Highlights
 
-| Metric | Result |
-|--------|--------|
-| Throughput | **6,500+ req/s** |
-| Response Time (p95) | **109ms** |
-| Concurrent Users | **1,000 VUs** |
-| Error Rate | **0%** |
+| Metric              | Result           |
+| ------------------- | ---------------- |
+| Throughput          | **6,500+ req/s** |
+| Response Time (p95) | **109ms**        |
+| Concurrent Users    | **1,000 VUs**    |
+| Error Rate          | **0%**           |
 
 **93.5% response time improvement** with Redis cache (687ms -> 45ms)
 
@@ -28,21 +26,25 @@
 ## Tech Stack
 
 **Backend**
+
 - Go 1.21 + Gin Framework
 - GORM (MySQL)
 - Redis (Caching + Click Counter)
 
 **Frontend**
+
 - React 18 + TypeScript
 - Vite + TailwindCSS
 
 **Infrastructure**
+
 - AWS EKS (Kubernetes)
 - RDS MySQL + ElastiCache Redis
 - ALB + ACM (HTTPS)
 - Terraform (IaC)
 
 **CI/CD & Monitoring**
+
 - GitHub Actions
 - Prometheus + Grafana
 - k6 (Load Testing)
@@ -75,6 +77,7 @@ flowchart TD
 ```
 
 **Implementation Details:**
+
 - **k6-operator**: Test definitions via Kubernetes CRD -> GitOps friendly
 - **Node Isolation**: Taint/Toleration separates k6 Pods from API Pods -> Accurate performance measurement
 - **Ephemeral Spot Nodes**: Scale-to-zero when idle, activated only during tests -> Cost savings
@@ -87,6 +90,7 @@ flowchart TD
 ![Grafana Dashboard](docs/images/stress-test-20260203-2243-grafana.png)
 
 **Implementation Details:**
+
 - **kube-prometheus-stack**: Integrated installation of Prometheus + Grafana + AlertManager via Helm
 - **k6 Metrics Integration**: Real-time visualization of load test results via Prometheus Remote Write
 - **Custom Dashboards**: Automatic dashboard provisioning via ConfigMap (managed by Terraform)
@@ -101,6 +105,7 @@ flowchart TD
 Configured a Bastion Host for secure access to RDS/Redis in Private Subnets.
 
 **Implementation Details:**
+
 - **Elastic IP**: Fixed IP maintained even after instance restart
 - **SSH Tunnel**: Direct access to RDS/Redis via SSH Tunnel from DataGrip
 - **Least Privilege**: Security Group allowing only Bastion -> RDS/Redis
@@ -116,6 +121,7 @@ Introduced a Redis caching strategy to reduce DB load and improve response speed
 ![Redis Cache Sequence](docs/images/redis-cache-sequence.png)
 
 **Implementation Details:**
+
 - **URL Lookup Caching**: Cache-Aside pattern (TTL: 1h)
 - **Click Counter**: Redis INCR (atomic) -> Background worker syncs to DB
 - **Graceful Degradation**: Falls back to DB when Redis is unavailable
@@ -151,6 +157,7 @@ flowchart TD
 ```
 
 **Implementation Details:**
+
 - **Path-Based Triggers**: Workflows run only when `apps/api/**` or `apps/web/**` are changed
 - **Image Tagging**: Tagged with Git SHA for easy rollback
 - **Zero-Downtime Deployment**: Rolling Update via `kubectl rollout restart`
@@ -161,19 +168,19 @@ flowchart TD
 
 ### Before and After Redis Cache
 
-| Metric | Before | After | Improvement |
-|--------|--------|-------|-------------|
-| Avg Response Time | 687ms | 45ms | **-93.5%** |
-| p(95) Response Time | 2.47s | 109ms | **-95.6%** |
-| Throughput | 1,187 req/s | 6,504 req/s | **+448%** |
+| Metric              | Before      | After       | Improvement |
+| ------------------- | ----------- | ----------- | ----------- |
+| Avg Response Time   | 687ms       | 45ms        | **-93.5%**  |
+| p(95) Response Time | 2.47s       | 109ms       | **-95.6%**  |
+| Throughput          | 1,187 req/s | 6,504 req/s | **+448%**   |
 
 ### Problems Solved
 
-| Problem | Cause | Solution |
-|---------|-------|----------|
-| Too many connections | Connection Pool not configured | Limited to 25 connections per Pod |
-| 50% click count loss | Read-Modify-Write Race Condition | Atomic SQL update (`clicks = clicks + 1`) |
-| Response delay under high load | DB query on every request | Redis caching + click batch synchronization |
+| Problem                        | Cause                            | Solution                                    |
+| ------------------------------ | -------------------------------- | ------------------------------------------- |
+| Too many connections           | Connection Pool not configured   | Limited to 25 connections per Pod           |
+| 50% click count loss           | Read-Modify-Write Race Condition | Atomic SQL update (`clicks = clicks + 1`)   |
+| Response delay under high load | DB query on every request        | Redis caching + click batch synchronization |
 
 ---
 
@@ -196,11 +203,11 @@ npm install && npm run dev
 
 ### API Endpoints
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/health` | Health check |
-| POST | `/api/urls` | Create shortened URL |
-| GET | `/r/{shortUrl}` | Redirect |
+| Method | Path            | Description          |
+| ------ | --------------- | -------------------- |
+| GET    | `/health`       | Health check         |
+| POST   | `/api/urls`     | Create shortened URL |
+| GET    | `/r/{shortUrl}` | Redirect             |
 
 ---
 
@@ -246,14 +253,14 @@ tunelink/
 
 ## Documentation
 
-| Document | Description |
-|----------|-------------|
-| [spec.md](docs/spec.md) | Project planning and design |
-| [deploy.md](docs/deploy.md) | AWS deployment guide (end-to-end) |
-| [monitoring.md](docs/monitoring.md) | Prometheus + Grafana setup |
-| [test.md](docs/test.md) | k6 load testing strategy |
-| [test-result.md](docs/test-result.md) | Load test results and improvement history |
-| [troubleshooting.md](docs/troubleshooting.md) | Troubleshooting guide |
+| Document                                      | Description                               |
+| --------------------------------------------- | ----------------------------------------- |
+| [spec.md](docs/spec.md)                       | Project planning and design               |
+| [deploy.md](docs/deploy.md)                   | AWS deployment guide (end-to-end)         |
+| [monitoring.md](docs/monitoring.md)           | Prometheus + Grafana setup                |
+| [test.md](docs/test.md)                       | k6 load testing strategy                  |
+| [test-result.md](docs/test-result.md)         | Load test results and improvement history |
+| [troubleshooting.md](docs/troubleshooting.md) | Troubleshooting guide                     |
 
 ---
 
@@ -263,19 +270,19 @@ tunelink/
 
 Actual cost for ~2 weeks (2026.01.23 ~ 02.05):
 
-| Service | Cost |
-|---------|------|
-| EKS Control Plane | $50 |
-| EC2-Other (NAT Gateway, EBS) | $23 |
-| Domain Registration | $20 |
-| ALB (Load Balancer) | $13 |
-| EC2 Instances (Spot) | $13 |
-| VPC | $9 |
-| RDS (MySQL) | $9 |
-| Tax | $5 |
-| Route 53 | $2 |
-| ElastiCache (Redis) | $1 |
-| **Total** | **$144** |
+| Service                      | Cost     |
+| ---------------------------- | -------- |
+| EKS Control Plane            | $50      |
+| EC2-Other (NAT Gateway, EBS) | $23      |
+| Domain Registration          | $20      |
+| ALB (Load Balancer)          | $13      |
+| EC2 Instances (Spot)         | $13      |
+| VPC                          | $9       |
+| RDS (MySQL)                  | $9       |
+| Tax                          | $5       |
+| Route 53                     | $2       |
+| ElastiCache (Redis)          | $1       |
+| **Total**                    | **$144** |
 
 ---
 
