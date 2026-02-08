@@ -267,57 +267,39 @@ VPC (10.0.0.0/16)
 ```
 
 **Network Architecture:**
-```
-                            Internet
-                               │
-                               ▼
-                    ┌──────────────────┐
-                    │  Internet Gateway │
-                    │   (tunelink-igw)  │
-                    └────────┬─────────┘
-                             │
-        ┌────────────────────┴────────────────────┐
-        │                   VPC                    │
-        │             10.0.0.0/16                  │
-        │                                          │
-        │  ┌─────────────────────────────────────┐ │
-        │  │         Public Subnets              │ │
-        │  │  ┌───────────────┬───────────────┐  │ │
-        │  │  │  10.0.1.0/24  │  10.0.2.0/24  │  │ │
-        │  │  │     (2a)      │     (2c)      │  │ │
-        │  │  │               │               │  │ │
-        │  │  │ ┌───────────┐ │               │  │ │
-        │  │  │ │    NAT    │ │               │  │ │
-        │  │  │ │  Gateway  │ │               │  │ │
-        │  │  │ └─────┬─────┘ │               │  │ │
-        │  │  └───────┼───────┴───────────────┘  │ │
-        │  └──────────┼──────────────────────────┘ │
-        │             │                            │
-        │             ▼                            │
-        │  ┌─────────────────────────────────────┐ │
-        │  │        Private Subnets              │ │
-        │  │  ┌───────────────┬───────────────┐  │ │
-        │  │  │ 10.0.11.0/24  │ 10.0.12.0/24  │  │ │
-        │  │  │     (2a)      │     (2c)      │  │ │
-        │  │  │               │               │  │ │
-        │  │  │  [EKS Nodes]  │  [EKS Nodes]  │  │ │
-        │  │  │  [RDS]        │  [RDS]        │  │ │
-        │  │  │  [Redis]      │  [Redis]      │  │ │
-        │  │  └───────────────┴───────────────┘  │ │
-        │  └─────────────────────────────────────┘ │
-        └──────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    Internet((Internet)):::external --> IGW["Internet Gateway<br/>(tunelink-igw)"]:::network
 
-Routing:
-┌─────────────────┬────────────────────────────────┐
-│  Public RT      │  0.0.0.0/0 → Internet Gateway  │
-├─────────────────┼────────────────────────────────┤
-│  Private RT     │  0.0.0.0/0 → NAT Gateway       │
-└─────────────────┴────────────────────────────────┘
+    subgraph VPC["VPC 10.0.0.0/16"]
+        subgraph Public["Public Subnets"]
+            Pub1["10.0.1.0/24 (2a)"]:::public
+            Pub2["10.0.2.0/24 (2c)"]:::public
+            NAT["NAT Gateway"]:::network
+        end
+        subgraph Private["Private Subnets"]
+            Priv1["10.0.11.0/24 (2a)<br/>EKS / RDS / Redis"]:::private
+            Priv2["10.0.12.0/24 (2c)<br/>EKS / RDS / Redis"]:::private
+        end
+    end
 
-Traffic Flow:
-• External → ALB → Public Subnet → EKS (Private)
-• EKS (Private) → NAT Gateway → Internet (external API calls, etc.)
+    IGW --> Public
+    NAT --> Private
+
+    classDef external fill:#f3e8ff,stroke:#7c3aed,color:#5b21b6
+    classDef network fill:#e0e7ff,stroke:#4f46e5,color:#3730a3
+    classDef public fill:#d1fae5,stroke:#059669,color:#065f46
+    classDef private fill:#fef3c7,stroke:#d97706,color:#92400e
 ```
+
+| Route Table | Destination |
+|-------------|-------------|
+| Public RT | `0.0.0.0/0` → Internet Gateway |
+| Private RT | `0.0.0.0/0` → NAT Gateway |
+
+**Traffic Flow:**
+- External → ALB → Public Subnet → EKS (Private)
+- EKS (Private) → NAT Gateway → Internet (external API calls, etc.)
 
 **Verify after apply:**
 ```bash
@@ -732,28 +714,26 @@ Helm Chart: grafana/k6-operator
 ```
 
 **Architecture:**
-```
-┌─────────────────────────────────────────────────────────┐
-│                    EKS Cluster                          │
-│                                                         │
-│  ┌─────────────────┐     ┌─────────────────────────┐   │
-│  │  k6-operator    │     │     tunelink namespace   │   │
-│  │  (controller)   │     │  ┌─────┐    ┌─────┐     │   │
-│  └────────┬────────┘     │  │ API │    │ Web │     │   │
-│           │              │  └──▲──┘    └──▲──┘     │   │
-│           │ creates      │     │          │        │   │
-│           ▼              │     │          │        │   │
-│  ┌─────────────────┐     │     │          │        │   │
-│  │   TestRun CRD   │─────┼─────┴──────────┘        │   │
-│  │  (k6 script)    │     │   HTTP requests         │   │
-│  └─────────────────┘     └─────────────────────────┘   │
-│           │                                             │
-│           ▼                                             │
-│  ┌─────────────────┐                                   │
-│  │   k6 Runner     │──────► Prometheus (metrics)       │
-│  │   Pods (1~N)    │──────► Grafana (dashboard)        │
-│  └─────────────────┘                                   │
-└─────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph EKS["EKS Cluster"]
+        Operator["k6-operator<br/>(controller)"]:::operator -->|creates| Runner["k6 Runner Pods (1~N)"]:::test
+
+        subgraph NS["tunelink namespace"]
+            API[API]:::service
+            Web[Web]:::service
+        end
+    end
+
+    Runner -->|"HTTP requests"| API
+    Runner -->|"HTTP requests"| Web
+    Runner -->|metrics| Prom["Prometheus"]:::monitor
+    Runner -->|dashboard| Graf["Grafana"]:::monitor
+
+    classDef operator fill:#e0e7ff,stroke:#4f46e5,color:#3730a3
+    classDef test fill:#fef3c7,stroke:#d97706,color:#92400e
+    classDef service fill:#d1fae5,stroke:#059669,color:#065f46
+    classDef monitor fill:#fee2e2,stroke:#dc2626,color:#991b1b
 ```
 
 **Verify after apply:**

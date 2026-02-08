@@ -22,42 +22,36 @@
 
 ## Architecture
 
-```
-                          ┌─────────────────┐
-                          │   Internet      │
-                          │ hearttune.link  │
-                          └────────┬────────┘
-                                   │ HTTPS
-                                   ▼
-┌──────────────────────────────────────────────────────────────────┐
-│                         EKS Cluster                              │
-│                                                                  │
-│                    ┌─────────────────┐                           │
-│                    │  Ingress / ALB  │                           │
-│                    └────────┬────────┘                           │
-│                             │                                    │
-│  ┌────────────────────────┐ │  ┌────────────────────────┐       │
-│  │   General Node Group   │ │  │  Loadtest Node Group    │       │
-│  │   (tunelink-dev-node)  │ │  │  (tunelink-dev-loadtest)│       │
-│  │                        │ │  │  taint: role=loadtest   │       │
-│  │  ┌─────┐  ┌─────┐     │ │  │                        │       │
-│  │  │ API │  │ Web │     │ │  │  ┌──────────────────┐  │       │
-│  │  └──┬──┘  └─────┘     │ │  │  │  k6 Runner Pods  │  │       │
-│  │     ▲                 │ │  │  │  (nodeSelector:  │  │       │
-│  │     │                 │ │  │  │   role=loadtest) │  │       │
-│  │     │                 │ │  │  └────────┬─────────┘  │       │
-│  └─────┼─────────────────┘ │  └───────────┼────────────┘       │
-│        │                   │              │                     │
-│        └───────────────────┘              │ External path       │
-│                                           │ (hearttune.link)    │
-│                                           ▼                     │
-│  ┌─────────────────────────┐       ┌──────────────┐            │
-│  │  k6-operator-system     │       │   Internet   │            │
-│  │  ┌───────────────────┐  │       └──────────────┘            │
-│  │  │   k6-operator     │──┼─── watches TestRun CRD ──────────▶│
-│  │  └───────────────────┘  │                                    │
-│  └─────────────────────────┘                                    │
-└──────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    Internet["Internet<br/>hearttune.link"]:::external -->|HTTPS| ALB
+
+    subgraph EKS["EKS Cluster"]
+        ALB["Ingress / ALB"]:::network
+
+        subgraph General["General Node Group"]
+            API["API<br/>(tunelink-dev-node)"]:::service
+            Web["Web<br/>(tunelink-dev-node)"]:::service
+        end
+
+        subgraph Loadtest["Loadtest Node Group"]
+            k6["k6 Runner Pods<br/>(taint: role=loadtest)"]:::test
+        end
+
+        subgraph Operator["k6-operator-system"]
+            op["k6-operator"]:::operator
+        end
+    end
+
+    ALB --> API
+    k6 -->|"External path<br/>(hearttune.link)"| Internet
+    op -->|"watches TestRun CRD"| k6
+
+    classDef external fill:#f3e8ff,stroke:#7c3aed,color:#5b21b6
+    classDef network fill:#e0e7ff,stroke:#4f46e5,color:#3730a3
+    classDef service fill:#d1fae5,stroke:#059669,color:#065f46
+    classDef test fill:#fef3c7,stroke:#d97706,color:#92400e
+    classDef operator fill:#fee2e2,stroke:#dc2626,color:#991b1b
 ```
 
 > **Note**: k6 tests through the external URL (`https://hearttune.link`), so the load test follows the same path as real users (Ingress/ALB → API).

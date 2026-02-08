@@ -49,35 +49,26 @@
 
 ![AWS Architecture](docs/images/aws-vpc-resource-map.png)
 
-```
-                         Internet
-                            │
-                            ▼
-                    ┌──────────────┐
-                    │   Route 53   │
-                    │ hearttune.link│
-                    └──────┬───────┘
-                           │
-                    ┌──────▼───────┐
-                    │  ALB (HTTPS) │
-                    └──────┬───────┘
-                           │
-        ┌──────────────────┴──────────────────┐
-        │              EKS Cluster             │
-        │                                      │
-        │   ┌─────────┐      ┌─────────┐      │
-        │   │   API   │      │   Web   │      │
-        │   │  (Go)   │      │ (React) │      │
-        │   └────┬────┘      └─────────┘      │
-        │        │                            │
-        └────────┼────────────────────────────┘
-                 │
-        ┌────────┴────────┐
-        │                 │
-   ┌────▼────┐      ┌─────▼─────┐
-   │  MySQL  │      │   Redis   │
-   │  (RDS)  │      │(ElastiCache)│
-   └─────────┘      └───────────┘
+```mermaid
+flowchart TD
+    Internet((Internet)):::external --> Route53["Route 53<br/>hearttune.link"]:::network
+    Route53 --> ALB["ALB (HTTPS)"]:::network
+
+    subgraph EKS["EKS Cluster"]
+        API["API (Go)"]:::service
+        Web["Web (React)"]:::service
+    end
+
+    ALB --> API
+    ALB --> Web
+    API --> MySQL[("MySQL (RDS)")]:::database
+    API --> Redis[("Redis (ElastiCache)")]:::cache
+
+    classDef external fill:#f3e8ff,stroke:#7c3aed,color:#5b21b6
+    classDef network fill:#e0e7ff,stroke:#4f46e5,color:#3730a3
+    classDef service fill:#d1fae5,stroke:#059669,color:#065f46
+    classDef database fill:#fef3c7,stroke:#d97706,color:#92400e
+    classDef cache fill:#fee2e2,stroke:#dc2626,color:#991b1b
 ```
 
 ---
@@ -88,21 +79,23 @@
 
 Built a Kubernetes-native load testing environment.
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                      EKS Cluster                         │
-│                                                          │
-│  ┌────────────────────┐    ┌────────────────────────┐   │
-│  │  General Node Group │    │  Loadtest Node Group    │   │
-│  │                    │    │   (Isolated via Taint)  │   │
-│  │  ┌─────┐ ┌─────┐  │    │  ┌──────────────────┐  │   │
-│  │  │ API │ │ Web │  │    │  │  k6 Runner Pods  │  │   │
-│  │  └─────┘ └─────┘  │    │  └────────┬─────────┘  │   │
-│  └────────────────────┘    └───────────┼────────────┘   │
-│                                        │                 │
-│                                        ▼                 │
-│                               https://hearttune.link     │
-└─────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph EKS["EKS Cluster"]
+        subgraph General["General Node Group"]
+            API[API]:::service
+            Web[Web]:::service
+        end
+        subgraph Loadtest["Loadtest Node Group"]
+            k6["k6 Runner Pods<br/>(Isolated via Taint)"]:::test
+        end
+    end
+
+    k6 -->|"test traffic"| URL["https://hearttune.link"]:::external
+
+    classDef service fill:#d1fae5,stroke:#059669,color:#065f46
+    classDef test fill:#fef3c7,stroke:#d97706,color:#92400e
+    classDef external fill:#e0e7ff,stroke:#4f46e5,color:#3730a3
 ```
 
 **Implementation Details:**
@@ -144,17 +137,19 @@ Configured a Bastion Host for secure access to RDS/Redis in Private Subnets.
 
 Introduced a Redis caching strategy to reduce DB load and improve response speed.
 
-```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│   Client    │────▶│    API      │────▶│   Redis     │
-└─────────────┘     └──────┬──────┘     └──────┬──────┘
-                           │                    │
-                           │ cache miss         │ INCR clicks
-                           ▼                    │
-                    ┌─────────────┐             │
-                    │    MySQL    │◀────────────┘
-                    │    (RDS)    │    batch sync
-                    └─────────────┘
+```mermaid
+flowchart TD
+    Client[Client]:::external --> API[API Server]:::service
+    API -->|"① cache lookup"| Redis[(Redis)]:::cache
+    Redis -.->|"cache hit"| API
+    API -->|"② cache miss"| MySQL[("MySQL (RDS)")]:::database
+    API -->|"③ INCR clicks"| Redis
+    Redis -->|"④ batch sync"| MySQL
+
+    classDef external fill:#f3e8ff,stroke:#7c3aed,color:#5b21b6
+    classDef service fill:#d1fae5,stroke:#059669,color:#065f46
+    classDef database fill:#fef3c7,stroke:#d97706,color:#92400e
+    classDef cache fill:#fee2e2,stroke:#dc2626,color:#991b1b
 ```
 
 **Implementation Details:**
@@ -168,18 +163,28 @@ Introduced a Redis caching strategy to reduce DB load and improve response speed
 
 Built an automated build/deploy pipeline with GitHub Actions.
 
-```
-Push to main
-     │
-     ├─── apps/api/** changed
-     │         │
-     │         ▼
-     │    Go Test → Docker Build → ECR Push → kubectl rollout
-     │
-     └─── apps/web/** changed
-               │
-               ▼
-          npm build → Docker Build → ECR Push → kubectl rollout
+```mermaid
+flowchart TD
+    Push["Push to main"]:::trigger --> APIChange["apps/api/** changed"]:::detect
+    Push --> WebChange["apps/web/** changed"]:::detect
+
+    subgraph api ["API Pipeline"]
+        GoTest["Go Test"]:::test --> DockerAPI["Docker Build"]:::build --> ECRAPI["ECR Push"]:::push --> DeployAPI["kubectl rollout"]:::deploy
+    end
+
+    subgraph web ["Web Pipeline"]
+        NpmBuild["npm build"]:::test --> DockerWeb["Docker Build"]:::build --> ECRWeb["ECR Push"]:::push --> DeployWeb["kubectl rollout"]:::deploy
+    end
+
+    APIChange --> GoTest
+    WebChange --> NpmBuild
+
+    classDef trigger fill:#e0e7ff,stroke:#4f46e5,color:#3730a3
+    classDef detect fill:#f3e8ff,stroke:#7c3aed,color:#5b21b6
+    classDef test fill:#fef3c7,stroke:#d97706,color:#92400e
+    classDef build fill:#d1fae5,stroke:#059669,color:#065f46
+    classDef push fill:#fee2e2,stroke:#dc2626,color:#991b1b
+    classDef deploy fill:#dbeafe,stroke:#2563eb,color:#1e40af
 ```
 
 **Implementation Details:**

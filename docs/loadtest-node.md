@@ -6,37 +6,30 @@ This is the configuration for isolating k6 load test Pods from API Pods to ensur
 
 ## Architecture
 
-```
-                          ┌─────────────────┐
-                          │   Internet      │
-                          │ hearttune.link  │
-                          └────────┬────────┘
-                                   │ HTTPS
-                                   ▼
-┌──────────────────────────────────────────────────────────────────┐
-│                         EKS Cluster                              │
-│                                                                  │
-│                    ┌─────────────────┐                           │
-│                    │  Ingress / ALB  │                           │
-│                    └────────┬────────┘                           │
-│                             │                                    │
-│  ┌────────────────────────┐ │  ┌────────────────────────┐       │
-│  │   General Node Group   │ │  │  Loadtest Node Group    │       │
-│  │   (tunelink-dev-node)  │ │  │  (tunelink-dev-loadtest)│       │
-│  │                        │ │  │                        │       │
-│  │  ┌─────┐  ┌─────┐     │ │  │  ┌─────┐               │       │
-│  │  │ API │  │ Web │     │ │  │  │ k6  │               │       │
-│  │  └──┬──┘  └─────┘     │ │  │  └──┬──┘               │       │
-│  │     ▲                 │ │  │     │                  │       │
-│  └─────┼─────────────────┘ │  └─────┼──────────────────┘       │
-│        │                   │        │                           │
-│        └───────────────────┘        │  External path            │
-│                                     │  (https://hearttune.link) │
-│                                     ▼                           │
-│                              ┌──────────────┐                   │
-│                              │   Internet   │                   │
-│                              └──────────────┘                   │
-└──────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    Internet["Internet<br/>hearttune.link"]:::external -->|HTTPS| ALB
+
+    subgraph EKS["EKS Cluster"]
+        ALB["Ingress / ALB"]:::network
+
+        subgraph General["General Node Group"]
+            API["API<br/>(tunelink-dev-node)"]:::service
+            Web["Web<br/>(tunelink-dev-node)"]:::service
+        end
+
+        subgraph Loadtest["Loadtest Node Group"]
+            k6["k6<br/>(tunelink-dev-loadtest)"]:::test
+        end
+    end
+
+    ALB --> API
+    k6 -->|"External path<br/>(hearttune.link)"| Internet
+
+    classDef external fill:#f3e8ff,stroke:#7c3aed,color:#5b21b6
+    classDef network fill:#e0e7ff,stroke:#4f46e5,color:#3730a3
+    classDef service fill:#d1fae5,stroke:#059669,color:#065f46
+    classDef test fill:#fef3c7,stroke:#d97706,color:#92400e
 ```
 
 > **Note**: Since k6 tests through the external URL (`https://hearttune.link`), load testing is conducted through the same path as actual users (Ingress/ALB -> API).

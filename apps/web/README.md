@@ -1,73 +1,60 @@
-# React + TypeScript + Vite
+# TuneLink Web
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+TuneLink의 프론트엔드 애플리케이션. URL 단축 서비스의 사용자 인터페이스를 제공합니다.
 
-Currently, two official plugins are available:
+## Tech Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- React 19 + TypeScript
+- Vite 7
+- TailwindCSS 4
+- Axios (HTTP Client)
+- Nginx (Production Serving)
 
-## React Compiler
+## Project Structure
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```
+src/
+├── app/
+│   ├── components/    # 공통 컴포넌트
+│   ├── hooks/         # 커스텀 훅
+│   ├── libs/          # HTTP 클라이언트 등 유틸리티
+│   ├── models/        # 데이터 모델 (URL 등)
+│   ├── repositories/  # API 통신 레이어
+│   ├── screens/       # 페이지 컴포넌트
+│   │   └── Home/      # 메인 화면
+│   └── services/      # 비즈니스 로직
+├── App.tsx            # 루트 컴포넌트
+└── main.tsx           # 엔트리포인트
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Getting Started
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+```bash
+# 의존성 설치
+npm install
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+# 개발 서버 실행 (기본 포트: 5173)
+npm run dev
+
+# 프로덕션 빌드
+npm run build
+
+# 빌드 결과물 미리보기
+npm run preview
+
+# 린트 실행
+npm run lint
+```
+
+## Environment
+
+API 서버 주소는 `apps/web/src/app/libs/http-client.ts`에서 설정합니다.
+
+## Docker
+
+Nginx 기반의 프로덕션 이미지로 빌드됩니다.
+
+```bash
+docker build -t tunelink-web .
+docker run -p 80:80 tunelink-web
 ```

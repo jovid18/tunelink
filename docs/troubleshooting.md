@@ -451,17 +451,19 @@ func (r *URLRepository) IncrementClicks(ctx context.Context, shortURL string) er
 
 **Architecture:**
 
-```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│   Client    │────▶│    API      │────▶│   Redis     │
-└─────────────┘     └──────┬──────┘     └──────┬──────┘
-                           │                    │
-                           │ cache miss         │ INCR clicks
-                           ▼                    │
-                    ┌─────────────┐             │
-                    │    MySQL    │◀────────────┘
-                    │    (RDS)    │    batch sync
-                    └─────────────┘
+```mermaid
+flowchart TD
+    Client[Client]:::external --> API[API Server]:::service
+    API -->|"① cache lookup"| Redis[(Redis)]:::cache
+    Redis -.->|"cache hit"| API
+    API -->|"② cache miss"| MySQL[("MySQL (RDS)")]:::database
+    API -->|"③ INCR clicks"| Redis
+    Redis -->|"④ batch sync"| MySQL
+
+    classDef external fill:#f3e8ff,stroke:#7c3aed,color:#5b21b6
+    classDef service fill:#d1fae5,stroke:#059669,color:#065f46
+    classDef database fill:#fef3c7,stroke:#d97706,color:#92400e
+    classDef cache fill:#fee2e2,stroke:#dc2626,color:#991b1b
 ```
 
 **Performance Improvement Results (Stress Test 1000 VUs):**

@@ -169,12 +169,20 @@ tunelink/
 
 **Dependency Graph:**
 
-```
-VPC ─┬─→ RDS
-     ├─→ ElastiCache
-     ├─→ EKS ─→ ALB Controller ─→ K8s Base ─┬─→ K8s API
-     │                                       └─→ K8s Web
-     └─→ ECR
+```mermaid
+flowchart LR
+    VPC:::network --> RDS:::database
+    VPC --> ElastiCache:::cache
+    VPC --> EKS:::service --> ALB["ALB Controller"]:::network --> Base["K8s Base"]:::service
+    Base --> API["K8s API"]:::deploy
+    Base --> Web["K8s Web"]:::deploy
+    VPC --> ECR:::service
+
+    classDef network fill:#e0e7ff,stroke:#4f46e5,color:#3730a3
+    classDef service fill:#d1fae5,stroke:#059669,color:#065f46
+    classDef database fill:#fef3c7,stroke:#d97706,color:#92400e
+    classDef cache fill:#fee2e2,stroke:#dc2626,color:#991b1b
+    classDef deploy fill:#f3e8ff,stroke:#7c3aed,color:#5b21b6
 ```
 
 ---
@@ -218,31 +226,30 @@ Push → GitHub Actions
 
 ## Network Architecture
 
-```
-                    ┌─────────────────────────────────────────────┐
-                    │                    VPC                       │
-                    │                                              │
-   Internet ───────►│  ┌──────────────────────────────────────┐   │
-                    │  │         Public Subnet                 │   │
-                    │  │  ┌─────────────┐                      │   │
-                    │  │  │ ALB (Ingress)│                     │   │
-                    │  │  └──────┬──────┘                      │   │
-                    │  └─────────┼────────────────────────────┘   │
-                    │            │                                 │
-                    │  ┌─────────▼────────────────────────────┐   │
-                    │  │         Private Subnet                │   │
-                    │  │                                       │   │
-                    │  │  ┌─────────┐      ┌─────────┐         │   │
-                    │  │  │   API   │◄────►│   Web   │         │   │
-                    │  │  │  (Pod)  │      │  (Pod)  │         │   │
-                    │  │  └────┬────┘      └─────────┘         │   │
-                    │  │       │                               │   │
-                    │  │  ┌────▼────┐      ┌─────────┐         │   │
-                    │  │  │  MySQL  │      │  Redis  │         │   │
-                    │  │  │  (RDS)  │      │(ElastiC)│         │   │
-                    │  │  └─────────┘      └─────────┘         │   │
-                    │  └───────────────────────────────────────┘   │
-                    └─────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    Internet((Internet)):::external -->|HTTPS| ALB
+
+    subgraph VPC
+        subgraph Public["Public Subnet"]
+            ALB["ALB (Ingress)"]:::network
+        end
+        subgraph Private["Private Subnet"]
+            API["API (Pod)"]:::service <-->  Web["Web (Pod)"]:::service
+            MySQL[("MySQL (RDS)")]:::database
+            Redis[("Redis (ElastiCache)")]:::cache
+        end
+    end
+
+    ALB --> API
+    API --> MySQL
+    API --> Redis
+
+    classDef external fill:#f3e8ff,stroke:#7c3aed,color:#5b21b6
+    classDef network fill:#e0e7ff,stroke:#4f46e5,color:#3730a3
+    classDef service fill:#d1fae5,stroke:#059669,color:#065f46
+    classDef database fill:#fef3c7,stroke:#d97706,color:#92400e
+    classDef cache fill:#fee2e2,stroke:#dc2626,color:#991b1b
 ```
 
 ---
