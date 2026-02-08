@@ -209,26 +209,37 @@ npm install && npm run dev
 ```
 tunelink/
 ├── apps/
-│   ├── api/                 # Go API server
-│   │   ├── cmd/api/         # Entry point
-│   │   └── internal/        # Business logic
-│   └── web/                 # React frontend
+│   ├── api/                       # Go API server
+│   │   ├── cmd/api/               # Entry point (main.go)
+│   │   └── internal/              # Hexagonal architecture
+│   │       ├── adapter/in/http/   # HTTP handler, DTO
+│   │       ├── adapter/out/       # Cache (Redis/Noop), Persistence (MySQL)
+│   │       ├── application/       # Use cases, Ports
+│   │       ├── domain/            # Entity, Repository interface
+│   │       └── infrastructure/    # Config
+│   └── web/                       # React frontend (Vite + TypeScript)
 │
 ├── infra/
-│   └── terraform/
-│       ├── modules/         # Reusable Terraform modules
-│       │   ├── vpc/         # VPC, Subnet, NAT Gateway
-│       │   ├── eks/         # EKS Cluster + Node Groups
-│       │   ├── rds/         # MySQL (RDS)
-│       │   ├── elasticache/ # Redis (ElastiCache)
-│       │   ├── bastion/     # Bastion Host + Elastic IP
-│       │   ├── monitoring/  # Prometheus + Grafana
-│       │   ├── k6_operator/ # k6 Load Testing
-│       │   └── ...
-│       └── envs/dev/        # Environment-specific configuration
+│   ├── main.tf                    # Root Terraform configuration
+│   ├── variables.tf / outputs.tf
+│   └── modules/
+│       ├── vpc/                   # VPC, Subnet, NAT Gateway
+│       ├── eks/                   # EKS Cluster + Node Groups
+│       ├── rds/                   # MySQL (RDS)
+│       ├── elasticache/           # Redis (ElastiCache)
+│       ├── ecr/                   # Container Registry
+│       ├── bastion/               # Bastion Host + Elastic IP
+│       ├── alb_controller/        # AWS Load Balancer Controller
+│       ├── k8s_base/              # K8s Namespace, Ingress, Secrets
+│       ├── k8s_api/               # API Deployment + Service
+│       ├── k8s_web/               # Web Deployment + Service
+│       ├── monitoring/            # Prometheus + Grafana
+│       └── k6_operator/           # k6 Load Testing (scripts + testruns)
 │
-├── .github/workflows/       # CI/CD Pipeline
-└── docs/                    # Project documentation
+├── .github/workflows/             # CI/CD Pipeline (api.yml, web.yml)
+├── docker-compose.yml             # Local development
+├── Makefile                       # Build & deploy commands
+└── docs/                          # Project documentation
 ```
 
 ---
