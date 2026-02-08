@@ -77,7 +77,7 @@ flowchart TD
 **Implementation Details:**
 - **k6-operator**: Test definitions via Kubernetes CRD -> GitOps friendly
 - **Node Isolation**: Taint/Toleration separates k6 Pods from API Pods -> Accurate performance measurement
-- **On-Demand Nodes**: Nodes activated only during tests -> Cost savings
+- **Spot Instances**: Nodes activated only during tests -> Cost savings
 - **External Path Testing**: Tests run through the same path as real users (ALB -> API)
 
 ---
