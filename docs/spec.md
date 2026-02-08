@@ -1,43 +1,43 @@
 # TuneLink - URL Shortener
 
-## 서비스 개요
+## Service Overview
 
-| 항목      | 결정                             |
-| --------- | -------------------------------- |
-| 서비스    | URL Shortener (링크 단축 서비스) |
-| 인증      | 없음 (MVP 단계)                  |
-| 진행 방식 | 로컬 개발환경 먼저 → AWS 배포    |
+| Item      | Decision                             |
+| --------- | ------------------------------------ |
+| Service   | URL Shortener (Link shortening service) |
+| Auth      | None (MVP stage)                     |
+| Approach  | Local dev environment first → AWS deployment |
 
-### 핵심 기능 (MVP)
+### Core Features (MVP)
 
-- 긴 URL → 짧은 URL 생성
-- 짧은 URL 접속 시 원본 URL로 리다이렉트
-- (선택) 클릭 수 통계
+- Long URL → Short URL generation
+- Redirect to original URL when accessing short URL
+- (Optional) Click count statistics
 
-### API 엔드포인트
+### API Endpoints
 
-| Method | Path            | 설명          |
-| ------ | --------------- | ------------- |
-| GET    | `/health`       | 헬스체크      |
-| POST   | `/api/urls`     | URL 단축 생성 |
-| GET    | `/r/{shortUrl}` | 리다이렉트    |
+| Method | Path            | Description      |
+| ------ | --------------- | ---------------- |
+| GET    | `/health`       | Health check     |
+| POST   | `/api/urls`     | Create short URL |
+| GET    | `/r/{shortUrl}` | Redirect         |
 
-### DB 스키마
+### DB Schema
 
-**테이블: `urls`**
-| 컬럼 | 타입 | 설명 |
+**Table: `urls`**
+| Column | Type | Description |
 |------|------|------|
 | id | BIGINT | PK |
-| short_url | VARCHAR(10) | 단축 코드 |
-| original_url | TEXT | 원본 URL |
-| clicks | BIGINT | 클릭 수 |
-| created_at | TIMESTAMP | 생성일 |
+| short_url | VARCHAR(10) | Short code |
+| original_url | TEXT | Original URL |
+| clicks | BIGINT | Click count |
+| created_at | TIMESTAMP | Created date |
 
 ---
 
-## 기술 스택
+## Tech Stack
 
-| 영역          | 기술                  |
+| Area          | Technology            |
 | ------------- | --------------------- |
 | Backend       | Go + Gin              |
 | Frontend      | React + Vite          |
@@ -45,38 +45,38 @@
 | Cache         | Redis                 |
 | Container     | Docker                |
 | Orchestration | Kubernetes (EKS)      |
-| IaC           | Terraform (Helm 없음) |
+| IaC           | Terraform (No Helm)   |
 | CI/CD         | GitHub Actions        |
 
 ---
 
-## 레포 구조 (모노레포)
+## Repo Structure (Monorepo)
 
 ```
 tunelink/
 ├── apps/
-│   ├── api/                     # Go + Gin API 서버
+│   ├── api/                     # Go + Gin API server
 │   │   ├── cmd/
 │   │   │   └── api/
 │   │   │       └── main.go
 │   │   ├── internal/
-│   │   │   ├── handler/         # HTTP 핸들러
-│   │   │   ├── service/         # 비즈니스 로직
-│   │   │   ├── repository/      # DB 접근
-│   │   │   ├── model/           # 도메인 모델
-│   │   │   └── config/          # 설정
+│   │   │   ├── handler/         # HTTP handlers
+│   │   │   ├── service/         # Business logic
+│   │   │   ├── repository/      # DB access
+│   │   │   ├── model/           # Domain models
+│   │   │   └── config/          # Configuration
 │   │   ├── Dockerfile
 │   │   ├── go.mod
 │   │   └── go.sum
 │   │
-│   └── web/                     # React + Vite 프론트엔드
+│   └── web/                     # React + Vite frontend
 │       ├── src/
 │       │   ├── components/
 │       │   ├── pages/
 │       │   ├── hooks/
 │       │   ├── api/
 │       │   └── main.tsx
-│       ├── Dockerfile           # nginx로 정적 파일 서빙
+│       ├── Dockerfile           # Serve static files with nginx
 │       ├── nginx.conf
 │       ├── package.json
 │       └── vite.config.ts
@@ -94,10 +94,10 @@ tunelink/
 │       │
 │       └── modules/
 │           ├── vpc/             # VPC, Subnet, IGW, NAT
-│           ├── eks/             # EKS 클러스터
+│           ├── eks/             # EKS cluster
 │           ├── rds/             # MySQL (RDS)
 │           ├── elasticache/     # Redis (ElastiCache)
-│           ├── ecr/             # 컨테이너 레지스트리
+│           ├── ecr/             # Container registry
 │           ├── alb_controller/  # AWS Load Balancer Controller
 │           ├── k8s_base/        # namespace, configmap, secret
 │           ├── k8s_api/         # api deployment, service
@@ -105,69 +105,69 @@ tunelink/
 │
 ├── .github/
 │   └── workflows/
-│       ├── api.yml              # api 변경 시 빌드/푸시/배포
-│       ├── web.yml              # web 변경 시 빌드/푸시/배포
-│       └── infra.yml            # infra 변경 시 plan/apply
+│       ├── api.yml              # Build/push/deploy on api changes
+│       ├── web.yml              # Build/push/deploy on web changes
+│       └── infra.yml            # Plan/apply on infra changes
 │
 ├── scripts/
-│   ├── local-dev.sh             # 로컬 개발 환경 셋업
-│   └── init-tf.sh               # Terraform 초기화
+│   ├── local-dev.sh             # Local dev environment setup
+│   └── init-tf.sh               # Terraform initialization
 │
 ├── docs/
 ├── Makefile
-├── docker-compose.yml           # 로컬 개발용 (MySQL, Redis)
+├── docker-compose.yml           # For local development (MySQL, Redis)
 └── README.md
 ```
 
 ---
 
-## 개발 흐름
+## Development Flow
 
-### Phase 1: 로컬 개발 환경
+### Phase 1: Local Development Environment
 
 ```
-[개발자 로컬]
+[Developer Local]
     │
-    ├── docker-compose up        # MySQL + Redis 로컬 실행
-    ├── apps/api → go run        # API 서버 (localhost:8080)
+    ├── docker-compose up        # Run MySQL + Redis locally
+    ├── apps/api → go run        # API server (localhost:8080)
     └── apps/web → npm run dev   # Vite dev server (localhost:5173)
 ```
 
-**목표**: API/Web 기능 개발, DB 스키마 설계
+**Goal**: API/Web feature development, DB schema design
 
 ---
 
-### Phase 2: AWS 인프라 프로비저닝
+### Phase 2: AWS Infrastructure Provisioning
 
 ```
-[Terraform Apply 순서]
+[Terraform Apply Order]
 
-1. VPC 모듈
+1. VPC Module
    └── VPC, Public/Private Subnet, IGW, NAT Gateway
 
-2. ECR 모듈
-   └── api, web 이미지 저장소
+2. ECR Module
+   └── api, web image repositories
 
-3. RDS 모듈
+3. RDS Module
    └── MySQL (Private Subnet)
 
-4. ElastiCache 모듈
+4. ElastiCache Module
    └── Redis (Private Subnet)
 
-5. EKS 모듈
+5. EKS Module
    └── EKS Cluster + Node Group (Private Subnet)
 
-6. ALB Controller 모듈
+6. ALB Controller Module
    └── AWS Load Balancer Controller (IRSA)
 
-7. K8s Base 모듈
+7. K8s Base Module
    └── Namespace, ConfigMap, Secret
 
-8. K8s API/Web 모듈
+8. K8s API/Web Module
    └── Deployment, Service, Ingress
 ```
 
-**의존성 그래프:**
+**Dependency Graph:**
 
 ```
 VPC ─┬─→ RDS
@@ -179,9 +179,9 @@ VPC ─┬─→ RDS
 
 ---
 
-### Phase 3: CI/CD 파이프라인
+### Phase 3: CI/CD Pipeline
 
-#### API 변경 시 (apps/api/\*\*)
+#### On API Changes (apps/api/\*\*)
 
 ```
 Push → GitHub Actions
@@ -190,10 +190,10 @@ Push → GitHub Actions
          ├── Docker Build
          ├── ECR Push (tag: commit SHA)
          └── Terraform Apply
-             └── k8s_api 모듈 (image_tag 변수 업데이트)
+             └── k8s_api module (update image_tag variable)
 ```
 
-#### Web 변경 시 (apps/web/\*\*)
+#### On Web Changes (apps/web/\*\*)
 
 ```
 Push → GitHub Actions
@@ -202,21 +202,21 @@ Push → GitHub Actions
          ├── Docker Build (nginx)
          ├── ECR Push (tag: commit SHA)
          └── Terraform Apply
-             └── k8s_web 모듈 (image_tag 변수 업데이트)
+             └── k8s_web module (update image_tag variable)
 ```
 
-#### Infra 변경 시 (infra/\*\*)
+#### On Infra Changes (infra/\*\*)
 
 ```
 Push → GitHub Actions
          │
-         ├── Terraform Plan (PR에 코멘트)
-         └── Terraform Apply (main 머지 시)
+         ├── Terraform Plan (comment on PR)
+         └── Terraform Apply (on merge to main)
 ```
 
 ---
 
-## 네트워크 구조
+## Network Architecture
 
 ```
                     ┌─────────────────────────────────────────────┐
@@ -247,14 +247,14 @@ Push → GitHub Actions
 
 ---
 
-## Ingress 라우팅 (Path 기반)
+## Ingress Routing (Path-based)
 
 ```
 example.com/          → Web Service (React)
 example.com/api/*     → API Service (Go)
 ```
 
-**Terraform 리소스 예시:**
+**Terraform Resource Example:**
 
 ```hcl
 resource "kubernetes_ingress_v1" "main" {

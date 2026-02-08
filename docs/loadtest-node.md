@@ -1,14 +1,14 @@
-# Loadtest 노드 격리 설정
+# Loadtest Node Isolation Setup
 
-## 개요
+## Overview
 
-k6 부하테스트 Pod를 API Pod와 격리하여 정확한 성능 측정을 위한 설정입니다.
+This is the configuration for isolating k6 load test Pods from API Pods to ensure accurate performance measurement.
 
-## 아키텍처
+## Architecture
 
 ```
                           ┌─────────────────┐
-                          │   인터넷        │
+                          │   Internet      │
                           │ hearttune.link  │
                           └────────┬────────┘
                                    │ HTTPS
@@ -21,7 +21,7 @@ k6 부하테스트 Pod를 API Pod와 격리하여 정확한 성능 측정을 위
 │                    └────────┬────────┘                           │
 │                             │                                    │
 │  ┌────────────────────────┐ │  ┌────────────────────────┐       │
-│  │   일반 노드 그룹        │ │  │  Loadtest 노드 그룹     │       │
+│  │   General Node Group   │ │  │  Loadtest Node Group    │       │
 │  │   (tunelink-dev-node)  │ │  │  (tunelink-dev-loadtest)│       │
 │  │                        │ │  │                        │       │
 │  │  ┌─────┐  ┌─────┐     │ │  │  ┌─────┐               │       │
@@ -30,30 +30,30 @@ k6 부하테스트 Pod를 API Pod와 격리하여 정확한 성능 측정을 위
 │  │     ▲                 │ │  │     │                  │       │
 │  └─────┼─────────────────┘ │  └─────┼──────────────────┘       │
 │        │                   │        │                           │
-│        └───────────────────┘        │  외부 경로                │
+│        └───────────────────┘        │  External path            │
 │                                     │  (https://hearttune.link) │
 │                                     ▼                           │
 │                              ┌──────────────┐                   │
-│                              │   인터넷     │                   │
+│                              │   Internet   │                   │
 │                              └──────────────┘                   │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-> **참고**: k6는 외부 URL(`https://hearttune.link`)을 통해 테스트하므로, 실제 사용자와 동일한 경로(Ingress/ALB → API)로 부하테스트가 진행됩니다.
+> **Note**: Since k6 tests through the external URL (`https://hearttune.link`), load testing is conducted through the same path as actual users (Ingress/ALB -> API).
 
-## 왜 격리하나?
+## Why Isolate?
 
-| 방식 | 문제점 |
+| Approach | Problem |
 |------|--------|
-| 같은 노드 | k6가 CPU/Memory 사용 → API 성능 저하 → 결과 왜곡 |
-| **다른 노드 (격리)** | 리소스 경쟁 없음 → 정확한 측정 |
+| Same node | k6 uses CPU/Memory -> API performance degrades -> Results are skewed |
+| **Different node (isolated)** | No resource contention -> Accurate measurement |
 
-## Terraform 설정
+## Terraform Configuration
 
-### 노드 그룹 구성 (`infra/modules/eks/main.tf`)
+### Node Group Configuration (`infra/modules/eks/main.tf`)
 
 ```hcl
-# Loadtest 전용 노드 그룹
+# Dedicated loadtest node group
 resource "aws_eks_node_group" "loadtest" {
   count = var.loadtest_node_enabled ? 1 : 0
 
@@ -79,37 +79,37 @@ resource "aws_eks_node_group" "loadtest" {
 }
 ```
 
-### 변수 설정 (`infra/main.tf`)
+### Variable Configuration (`infra/main.tf`)
 
 ```hcl
 module "eks" {
   # ...
 
-  # Loadtest 노드 (테스트 시에만 활성화)
+  # Loadtest node (enable only during testing)
   loadtest_node_enabled      = true
-  loadtest_node_desired_size = 0  # 0 = 꺼짐, 1 = 켜짐
+  loadtest_node_desired_size = 0  # 0 = off, 1 = on
 }
 ```
 
-## 사용 방법
+## Usage
 
-### 1. 테스트 시작 전: 노드 켜기
+### 1. Before Testing: Turn On the Node
 
 ```bash
-# infra/main.tf 수정
+# Edit infra/main.tf
 loadtest_node_desired_size = 1
 
-# 적용
+# Apply
 cd infra
 terraform apply -target=module.eks
 
-# 노드 Ready 확인 (1-2분 소요)
+# Verify node is Ready (takes 1-2 minutes)
 kubectl get nodes -l role=loadtest
 ```
 
-### 2. 테스트 실행
+### 2. Run the Test
 
-k6 TestRun에 nodeSelector와 toleration 필요:
+The k6 TestRun requires nodeSelector and toleration:
 
 ```yaml
 spec:
@@ -123,29 +123,29 @@ spec:
         effect: "NoSchedule"
 ```
 
-### 3. 테스트 완료 후: 노드 끄기
+### 3. After Testing: Turn Off the Node
 
 ```bash
-# infra/main.tf 수정
+# Edit infra/main.tf
 loadtest_node_desired_size = 0
 
-# 적용
+# Apply
 cd infra
 terraform apply -target=module.eks
 ```
 
-## Taint & Toleration 설명
+## Taint & Toleration Explanation
 
-### Taint (노드에 설정)
+### Taint (set on the node)
 ```yaml
 taint:
   key: role
   value: loadtest
   effect: NO_SCHEDULE
 ```
-→ 일반 Pod는 이 노드에 스케줄링되지 않음
+-> Regular Pods will not be scheduled on this node
 
-### Toleration (Pod에 설정)
+### Toleration (set on the Pod)
 ```yaml
 tolerations:
   - key: "role"
@@ -153,26 +153,26 @@ tolerations:
     value: "loadtest"
     effect: "NoSchedule"
 ```
-→ k6 Pod만 이 노드에 스케줄링 허용
+-> Only k6 Pods are allowed to be scheduled on this node
 
-## 비용
+## Cost
 
-| 상태 | 노드 수 | 비용 |
+| State | Node Count | Cost |
 |------|--------|------|
-| 평소 (꺼짐) | 0 | $0 |
-| 테스트 중 (켜짐) | 1 | ~$0.05/시간 (SPOT t3.xlarge, 4 vCPU, 16GB) |
+| Normal (off) | 0 | $0 |
+| During testing (on) | 1 | ~$0.05/hour (SPOT t3.xlarge, 4 vCPU, 16GB) |
 
-> **참고**: SPOT 가격은 가용 영역과 시간대에 따라 변동됨. On-Demand 대비 60~70% 저렴.
+> **Note**: SPOT pricing varies by availability zone and time of day. 60-70% cheaper compared to On-Demand.
 
-## 주의사항
+## Cautions
 
-1. **SPOT 인스턴스**: 테스트 중 노드가 종료될 수 있음 (드묾)
-2. **노드 시작 시간**: 1-2분 소요
-3. **테스트 후 끄기**: 비용 절약을 위해 꼭 끄기
+1. **SPOT instances**: Nodes may be terminated during testing (rare)
+2. **Node startup time**: Takes 1-2 minutes
+3. **Turn off after testing**: Always turn off to save costs
 
-## 관련 파일
+## Related Files
 
-- `infra/modules/eks/main.tf` - 노드 그룹 정의
-- `infra/modules/eks/variables.tf` - 변수 정의
-- `infra/main.tf` - 변수 값 설정
-- `.claude/skills/k6-load-test/SKILL.md` - 테스트 스킬
+- `infra/modules/eks/main.tf` - Node group definition
+- `infra/modules/eks/variables.tf` - Variable definitions
+- `infra/main.tf` - Variable value configuration
+- `.claude/skills/k6-load-test/SKILL.md` - Test skill

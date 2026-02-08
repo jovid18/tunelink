@@ -2,25 +2,25 @@
 
 ## Terraform
 
-### Security Group Rule이 apply할 때마다 재생성되는 문제
+### Security Group Rules Recreated on Every Apply
 
-**날짜:** 2026-01-25
+**Date:** 2026-01-25
 
-**증상:**
+**Symptoms:**
 
-- `terraform apply` 실행 시 `aws_security_group_rule` 리소스가 매번 새로 생성됨
-- 예: `module.bastion.aws_security_group_rule.rds_from_bastion` 가 반복 생성
+- `aws_security_group_rule` resources are recreated every time `terraform apply` is run
+- Example: `module.bastion.aws_security_group_rule.rds_from_bastion` is repeatedly created
 
-**원인:**
+**Cause:**
 
-- Security Group에서 **inline rule** (`ingress {}`, `egress {}` 블록)과 **aws_security_group_rule** 리소스를 동시에 사용
-- Terraform이 apply 시 inline rule만 유지하고 외부에서 추가된 rule을 삭제함
-- 다음 apply에서 삭제된 rule이 다시 생성되는 무한 반복
+- Using **inline rules** (`ingress {}`, `egress {}` blocks) and **aws_security_group_rule** resources simultaneously in a Security Group
+- During apply, Terraform keeps only inline rules and deletes externally added rules
+- On the next apply, the deleted rules are recreated, causing an infinite loop
 
-**문제 코드 예시:**
+**Problematic Code Example:**
 
 ```hcl
-# RDS 모듈 - inline rule 사용
+# RDS module - using inline rules
 resource "aws_security_group" "rds" {
   ingress {  # inline rule
     from_port   = 3306
@@ -28,19 +28,19 @@ resource "aws_security_group" "rds" {
   }
 }
 
-# Bastion 모듈 - 별도 리소스로 같은 SG에 rule 추가
+# Bastion module - adding rules to the same SG as a separate resource
 resource "aws_security_group_rule" "rds_from_bastion" {
-  security_group_id = var.rds_security_group_id  # 충돌!
+  security_group_id = var.rds_security_group_id  # Conflict!
   ...
 }
 ```
 
-**해결 방법:**
+**Solution:**
 
-- Security Group에서 inline rule을 제거하고, 모든 rule을 `aws_security_group_rule` 리소스로 분리
+- Remove inline rules from the Security Group and separate all rules into `aws_security_group_rule` resources
 
 ```hcl
-# Security Group (rule 없이)
+# Security Group (without rules)
 resource "aws_security_group" "rds" {
   name        = "rds-sg"
   description = "Security group for RDS"
@@ -48,7 +48,7 @@ resource "aws_security_group" "rds" {
   tags = { Name = "rds-sg" }
 }
 
-# 별도 리소스로 분리
+# Separated into individual resources
 resource "aws_security_group_rule" "rds_ingress_vpc" {
   type              = "ingress"
   from_port         = 3306
@@ -59,36 +59,36 @@ resource "aws_security_group_rule" "rds_ingress_vpc" {
 }
 ```
 
-**참고:**
+**Notes:**
 
-- Terraform 공식 문서에서도 inline rule과 aws_security_group_rule 혼용을 권장하지 않음
-- 여러 모듈에서 같은 Security Group에 rule을 추가해야 하는 경우 반드시 `aws_security_group_rule` 사용
+- The official Terraform documentation also advises against mixing inline rules with aws_security_group_rule
+- When multiple modules need to add rules to the same Security Group, always use `aws_security_group_rule`
 
 ---
 
-### Security Group Rule 분리 후 InvalidPermission.Duplicate 에러
+### InvalidPermission.Duplicate Error After Separating Security Group Rules
 
-**날짜:** 2026-01-25
+**Date:** 2026-01-25
 
-**증상:**
+**Symptoms:**
 
-- inline rule을 `aws_security_group_rule`로 분리한 후 apply 시 에러 발생
+- Error occurs during apply after separating inline rules into `aws_security_group_rule`
 
 ```
 Error: InvalidPermission.Duplicate: the specified rule "peer: 10.0.0.0/16, TCP, from port: 3306, to port: 3306, ALLOW" already exists
 ```
 
-**원인:**
+**Cause:**
 
-- AWS에는 이미 해당 rule이 존재하지만, Terraform state에는 새로운 리소스로 인식
-- inline rule로 생성된 rule이 AWS에 남아있고, 새 리소스로 동일한 rule을 생성하려고 시도
+- The rule already exists in AWS, but Terraform state recognizes it as a new resource
+- The rule created by the inline rule remains in AWS, and the new resource attempts to create an identical rule
 
-**해결 방법:**
+**Solution:**
 
-- `terraform import`로 기존 AWS rule을 Terraform state에 가져오기
+- Use `terraform import` to import the existing AWS rule into the Terraform state
 
 ```bash
-# Security Group Rule import 형식
+# Security Group Rule import format
 # {sg_id}_{type}_{protocol}_{from_port}_{to_port}_{cidr}
 
 # ingress rule import
@@ -100,43 +100,43 @@ terraform import module.rds.aws_security_group_rule.rds_egress_all \
   sg-060140f0813bf330b_egress_all_0_0_0.0.0.0/0
 ```
 
-**import 후 확인:**
+**Verification After Import:**
 
 ```bash
 terraform plan
-# "No changes." 출력되면 성공
+# "No changes." output means success
 ```
 
-**참고:**
+**Notes:**
 
-- Security Group Rule의 import ID 형식: `{sg_id}_{type}_{protocol}_{from_port}_{to_port}_{source}`
-- source가 CIDR이면 그대로, Security Group이면 해당 SG ID 사용
+- Security Group Rule import ID format: `{sg_id}_{type}_{protocol}_{from_port}_{to_port}_{source}`
+- If the source is a CIDR, use it as-is; if it's a Security Group, use the corresponding SG ID
 
 ---
 
-### Bastion Host IP가 재시작 시 변경되는 문제
+### Bastion Host IP Changes on Restart
 
-**날짜:** 2026-02-01
+**Date:** 2026-02-01
 
-**증상:**
+**Symptoms:**
 
-- Bastion EC2 인스턴스 재시작 후 Public IP가 변경됨
-- DataGrip SSH Tunnel 연결 실패
-- 문서에 기록된 IP와 실제 IP 불일치
+- Public IP changes after restarting the Bastion EC2 instance
+- DataGrip SSH Tunnel connection fails
+- IP recorded in documentation does not match the actual IP
 
-**원인:**
+**Cause:**
 
-- EC2 인스턴스에 자동 할당된 Public IP는 인스턴스 중지/시작 시 변경됨
-- Elastic IP를 사용하지 않으면 IP가 고정되지 않음
+- The auto-assigned Public IP on an EC2 instance changes when the instance is stopped/started
+- Without an Elastic IP, the IP address is not fixed
 
-**해결 방법:**
+**Solution:**
 
-- Bastion 모듈에 Elastic IP 추가
+- Add an Elastic IP to the Bastion module
 
 ```hcl
 # infra/modules/bastion/main.tf
 
-# Elastic IP for Bastion (IP 고정)
+# Elastic IP for Bastion (fixed IP)
 resource "aws_eip" "bastion" {
   domain = "vpc"
 
@@ -161,7 +161,7 @@ output "public_ip" {
 }
 ```
 
-**적용:**
+**Applying the Change:**
 
 ```bash
 cd infra/terraform/envs/dev
@@ -169,22 +169,22 @@ terraform plan -target=module.bastion
 terraform apply -target=module.bastion
 ```
 
-**비용:**
+**Cost:**
 
-- Elastic IP가 EC2에 연결되어 있으면: **무료**
-- 연결 안 된 EIP만 시간당 ~$0.005 비용 발생
+- Elastic IP associated with an EC2 instance: **Free**
+- Unassociated EIP incurs a cost of ~$0.005 per hour
 
 ---
 
 ## Helm
 
-### k6-operator Helm 설치 시 Namespace 충돌
+### Namespace Conflict When Installing k6-operator via Helm
 
-**날짜:** 2026-01-25
+**Date:** 2026-01-25
 
-**증상:**
+**Symptoms:**
 
-- `terraform apply` 시 다양한 namespace 관련 에러 발생
+- Various namespace-related errors occur during `terraform apply`
 
 ```
 Error: namespaces "k6-operator-system" already exists
@@ -192,32 +192,32 @@ Error: no Namespace with the name "k6-operator-system" found
 Error: invalid ownership metadata; label validation error: missing key "app.kubernetes.io/managed-by": must be set to "Helm"
 ```
 
-**원인:**
+**Cause:**
 
-- Terraform의 `kubernetes_namespace`와 Helm의 `create_namespace`가 충돌
-- Helm은 자신이 관리하는 namespace에 특정 레이블/어노테이션이 있어야 함
-- `helm uninstall` 시 namespace도 함께 삭제되어 상태 불일치 발생
+- Conflict between Terraform's `kubernetes_namespace` and Helm's `create_namespace`
+- Helm requires specific labels/annotations on namespaces it manages
+- `helm uninstall` also deletes the namespace, causing state inconsistency
 
-**시도했던 방법들 (실패):**
+**Attempted Solutions (Failed):**
 
-1. **Helm만 사용 (`create_namespace = true`)**
-   - namespace가 이미 있으면: `already exists` 에러
-   - namespace가 없으면: 성공하지만, 다른 이유로 실패 시 상태 꼬임
+1. **Helm only (`create_namespace = true`)**
+   - If namespace already exists: `already exists` error
+   - If namespace doesn't exist: succeeds, but state becomes inconsistent if it fails for other reasons
 
 2. **Terraform namespace + Helm (`create_namespace = false`)**
-   - Helm이 namespace ownership 검사에서 실패
-   - `invalid ownership metadata` 에러
+   - Helm fails on namespace ownership check
+   - `invalid ownership metadata` error
 
-3. **kubectl로 namespace 생성 후 Helm 설치**
-   - Helm chart 자체가 namespace를 생성하려고 해서 충돌
+3. **Create namespace with kubectl, then install via Helm**
+   - The Helm chart itself tries to create the namespace, causing a conflict
 
-**해결 방법:**
+**Solution:**
 
-- Terraform으로 namespace 생성하되, **Helm이 인식할 수 있는 레이블/어노테이션 추가**
-- Helm chart의 namespace 생성 옵션도 비활성화
+- Create the namespace with Terraform, but **add labels/annotations that Helm can recognize**
+- Also disable the Helm chart's namespace creation option
 
 ```hcl
-# 1. Namespace에 Helm 레이블/어노테이션 추가
+# 1. Add Helm labels/annotations to Namespace
 resource "kubernetes_namespace" "k6_operator" {
   metadata {
     name = "k6-operator-system"
@@ -233,16 +233,16 @@ resource "kubernetes_namespace" "k6_operator" {
   }
 }
 
-# 2. Helm release 설정
+# 2. Helm release configuration
 resource "helm_release" "k6_operator" {
   name             = "k6-operator"
   repository       = "https://grafana.github.io/helm-charts"
   chart            = "k6-operator"
   namespace        = kubernetes_namespace.k6_operator.metadata[0].name
   version          = "4.2.0"
-  create_namespace = false  # Terraform이 이미 생성함
+  create_namespace = false  # Already created by Terraform
 
-  # Helm chart의 namespace 생성도 비활성화
+  # Also disable namespace creation in the Helm chart
   set {
     name  = "namespace.create"
     value = "false"
@@ -252,204 +252,204 @@ resource "helm_release" "k6_operator" {
 }
 ```
 
-**상태가 꼬였을 때 정리 방법:**
+**How to Clean Up When State is Corrupted:**
 
 ```bash
-# 1. Helm release 삭제
+# 1. Delete Helm release
 helm uninstall k6-operator -n k6-operator-system
 
-# 2. Namespace 삭제
+# 2. Delete Namespace
 kubectl delete ns k6-operator-system
 
-# 3. Terraform state에서 제거
+# 3. Remove from Terraform state
 terraform state rm module.k6_operator.helm_release.k6_operator
 terraform state rm module.k6_operator.kubernetes_namespace.k6_operator
 
-# 4. 다시 apply
+# 4. Re-apply
 terraform apply
 ```
 
-**핵심 포인트:**
+**Key Points:**
 
-- Helm은 자신이 관리하는 리소스에 `app.kubernetes.io/managed-by=Helm` 레이블 필요
-- `meta.helm.sh/release-name`, `meta.helm.sh/release-namespace` 어노테이션도 필요
-- 여러 도구가 같은 리소스를 관리하려 할 때 ownership 충돌 주의
+- Helm requires the `app.kubernetes.io/managed-by=Helm` label on resources it manages
+- The `meta.helm.sh/release-name` and `meta.helm.sh/release-namespace` annotations are also required
+- Be cautious of ownership conflicts when multiple tools try to manage the same resource
 
 ---
 
 ## Kubernetes
 
-### MySQL "Too many connections" 에러
+### MySQL "Too many connections" Error
 
-**날짜:** 2026-02-02
+**Date:** 2026-02-02
 
-**증상:**
+**Symptoms:**
 
-- 부하테스트 중 redirect 요청 실패율 급증 (44% 실패)
-- API Pod 로그에 아래 에러 반복:
+- Redirect request failure rate spikes during load testing (44% failures)
+- The following errors repeat in API Pod logs:
 
 ```
 Error 1040: Too many connections
 Error 1040 (08004): Too many connections
 ```
 
-**원인:**
+**Cause:**
 
-- API 코드에서 DB Connection Pool 설정이 없음
-- 각 Pod가 무제한으로 DB 연결 생성 시도
-- RDS db.t3.micro 인스턴스의 max_connections (~66-87) 초과
+- No DB Connection Pool configuration in the API code
+- Each Pod attempts to create unlimited DB connections
+- Exceeds the max_connections (~66-87) of the RDS db.t3.micro instance
 
-**문제 코드:**
+**Problematic Code:**
 
 ```go
 // infrastructure/config.go
 func connectDB() *gorm.DB {
     db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{...})
-    // ❌ Connection Pool 설정 없음!
+    // No Connection Pool configuration!
     return db
 }
 ```
 
-**해결 방법:**
+**Solution:**
 
-- GORM에서 underlying sql.DB를 가져와 Connection Pool 설정 추가
+- Get the underlying sql.DB from GORM and add Connection Pool settings
 
 ```go
 func connectDB() *gorm.DB {
     db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{...})
 
-    // Connection Pool 설정
+    // Connection Pool configuration
     sqlDB, err := db.DB()
     if err != nil {
         log.Fatal("Failed to get database instance:", err)
     }
-    sqlDB.SetMaxOpenConns(25)               // Pod당 최대 25개 연결
-    sqlDB.SetMaxIdleConns(10)               // 유휴 연결 10개 유지
-    sqlDB.SetConnMaxLifetime(5 * time.Minute) // 연결 수명 5분
+    sqlDB.SetMaxOpenConns(25)               // Max 25 connections per Pod
+    sqlDB.SetMaxIdleConns(10)               // Keep 10 idle connections
+    sqlDB.SetConnMaxLifetime(5 * time.Minute) // Connection lifetime of 5 minutes
 
     return db
 }
 ```
 
-**설정값 계산:**
+**Configuration Value Calculation:**
 
-| 항목 | 값 | 설명 |
-|------|-----|------|
-| RDS max_connections | ~66-87 | db.t3.micro 기준 |
-| API Pods | 2개 | 현재 replica 수 |
-| Pod당 MaxOpenConns | 25 | 2 × 25 = 50 (RDS 한도 내) |
-| 여유 연결 | ~16-37 | 다른 클라이언트용 (Bastion 등) |
+| Item | Value | Description |
+|------|-------|-------------|
+| RDS max_connections | ~66-87 | Based on db.t3.micro |
+| API Pods | 2 | Current replica count |
+| MaxOpenConns per Pod | 25 | 2 x 25 = 50 (within RDS limit) |
+| Spare connections | ~16-37 | For other clients (Bastion, etc.) |
 
-**적용 결과 (2026-02-03 Stress Test):**
+**Results After Applying (2026-02-03 Stress Test):**
 
-| 지표 | 적용 전 | 적용 후 |
-|------|--------|--------|
-| 에러율 | 28.2% | 0% |
-| URL 생성 성공률 | ~40% | 100% |
+| Metric | Before | After |
+|--------|--------|-------|
+| Error rate | 28.2% | 0% |
+| URL creation success rate | ~40% | 100% |
 | Peak RPS | 363 req/s | 733 req/s |
 
-- Connection Pool 설정만으로 고부하 환경(1000 VUs)에서 안정성 확보
-- 상세 결과: [test-result.md](./test-result.md)
+- Connection Pool settings alone ensured stability under high load (1000 VUs)
+- Detailed results: [test-result.md](./test-result.md)
 
-**추가 옵션: RDS Proxy**
+**Additional Option: RDS Proxy**
 
-- Connection Pool을 앱이 아닌 AWS에서 중앙 관리
-- Pod 스케일 아웃 시에도 RDS 연결 수 일정 유지
-- 비용 발생하므로 대규모 트래픽 시 고려
+- Centrally manages Connection Pools at the AWS level instead of the application
+- Maintains a consistent number of RDS connections even when Pods scale out
+- Incurs additional cost, so consider it for large-scale traffic
 
 ---
 
-### 클릭 카운트 동시성 문제 (Race Condition)
+### Click Count Concurrency Issue (Race Condition)
 
-**날짜:** 2026-02-03
+**Date:** 2026-02-03
 
-**증상:**
+**Symptoms:**
 
-- Stress Test에서 클릭 수가 예상의 약 50%만 기록됨
-- 예상: 300,000 클릭 (3,000 URLs × 100 redirects)
-- 실제: 149,705 클릭 (~50%)
-- 평균/최소/최대 클릭 수가 불균일 (avg: 49.9, min: 24, max: 86)
+- Only about 50% of expected clicks were recorded during the Stress Test
+- Expected: 300,000 clicks (3,000 URLs x 100 redirects)
+- Actual: 149,705 clicks (~50%)
+- Average/minimum/maximum click counts were uneven (avg: 49.9, min: 24, max: 86)
 
-**원인:**
+**Cause:**
 
-- Read → Modify → Write 패턴의 Race Condition (Lost Update)
-- 동시 요청 시 여러 고루틴이 같은 값을 읽고 각각 +1 후 저장
-- 결과적으로 일부 증가분 손실
+- Race Condition from the Read -> Modify -> Write pattern (Lost Update)
+- Under concurrent requests, multiple goroutines read the same value, each increment by +1, and save
+- As a result, some increments are lost
 
-**문제 코드:**
+**Problematic Code:**
 
 ```go
-// usecase.go - 이전 방식
+// usecase.go - previous approach
 func (uc *urlUseCase) incrementClicks(shortURL string) {
     ctx := context.Background()
-    entity, err := uc.repo.FindByShortURL(ctx, shortURL)  // 1. 읽기: clicks=50
+    entity, err := uc.repo.FindByShortURL(ctx, shortURL)  // 1. Read: clicks=50
     if err != nil {
         return
     }
-    entity.IncrementClicks()                              // 2. 메모리에서 +1: clicks=51
-    uc.repo.Update(ctx, entity)                           // 3. 저장: clicks=51
+    entity.IncrementClicks()                              // 2. Increment in memory: clicks=51
+    uc.repo.Update(ctx, entity)                           // 3. Save: clicks=51
 }
-// 동시에 10개 요청이 오면 모두 clicks=50을 읽고 51로 저장 → 9개 손실
+// If 10 concurrent requests arrive, all read clicks=50 and save 51 -> 9 lost
 ```
 
-**해결 방법:**
+**Solution:**
 
-- SQL 레벨의 원자적 업데이트 사용 (커밋: 68f99c5)
+- Use atomic update at the SQL level (commit: 68f99c5)
 
 ```go
-// url_repository.go - 수정된 방식
+// url_repository.go - corrected approach
 func (r *URLRepository) IncrementClicks(ctx context.Context, shortURL string) error {
     return r.db.WithContext(ctx).
         Model(&url.URL{}).
         Where("short_url = ?", shortURL).
         UpdateColumn("clicks", gorm.Expr("clicks + 1")).Error
         // SQL: UPDATE urls SET clicks = clicks + 1 WHERE short_url = ?
-        // DB 레벨에서 원자적으로 처리되어 Lost Update 방지
+        // Processed atomically at the DB level to prevent Lost Updates
 }
 ```
 
-**적용 결과 (2026-02-03 Stress Test):**
+**Results After Applying (2026-02-03 Stress Test):**
 
-| 지표 | 적용 전 | 적용 후 |
-|------|--------|--------|
-| 예상 클릭 | 300,000 | 300,000 |
-| 실제 클릭 | 149,705 (~50%) | 300,000 (100%) |
-| 평균 클릭 | 49.9 | 100 |
-| 최소/최대 | 24 / 86 | 100 / 100 |
+| Metric | Before | After |
+|--------|--------|-------|
+| Expected clicks | 300,000 | 300,000 |
+| Actual clicks | 149,705 (~50%) | 300,000 (100%) |
+| Average clicks | 49.9 | 100 |
+| Min/Max | 24 / 86 | 100 / 100 |
 
-**핵심 포인트:**
+**Key Points:**
 
-- 동시성 환경에서 카운터 증가는 반드시 **원자적 연산** 사용
-- `SELECT → UPDATE`가 아닌 `UPDATE ... SET col = col + 1` 패턴
-- 대안: Redis INCR, PostgreSQL RETURNING, DB Lock 등
+- Counter increments in concurrent environments must use **atomic operations**
+- Use the `UPDATE ... SET col = col + 1` pattern instead of `SELECT -> UPDATE`
+- Alternatives: Redis INCR, PostgreSQL RETURNING, DB Locks, etc.
 
-**상세 결과:** [test-result.md](./test-result.md)
+**Detailed Results:** [test-result.md](./test-result.md)
 
 ---
 
-### Redis 캐시 통합 및 클릭 수 동기화
+### Redis Cache Integration and Click Count Synchronization
 
-**날짜:** 2026-02-03
+**Date:** 2026-02-03
 
-**배경:**
+**Background:**
 
-- DB 직접 조회 방식의 응답시간이 고부하 시 급격히 증가 (avg 687ms)
-- 클릭 수 증가를 DB 원자적 업데이트로 처리해도 DB 부하 발생
-- Redis 캐시 도입으로 성능 개선 필요
+- Response times with direct DB queries increased dramatically under high load (avg 687ms)
+- Even with atomic DB updates for click count increments, DB load remained an issue
+- Redis cache adoption was needed to improve performance
 
-**구현 내용 (커밋: 339aac5, 0b67b36):**
+**Implementation Details (commits: 339aac5, 0b67b36):**
 
-1. **URL 조회 캐싱**
-   - Redis에 URL 정보 캐싱 (TTL: 1시간)
-   - 캐시 히트 시 DB 조회 스킵
-   - 캐시 미스 시 DB 조회 후 캐싱
+1. **URL Lookup Caching**
+   - Cache URL information in Redis (TTL: 1 hour)
+   - Skip DB query on cache hit
+   - Query DB and cache the result on cache miss
 
-2. **클릭 수 Redis INCR + 배치 동기화**
-   - 클릭 발생 시 Redis `INCR` (원자적, 빠름)
-   - 백그라운드 워커가 주기적으로 DB 동기화
-   - DB 부하 분산 + 정확성 보장
+2. **Click Count via Redis INCR + Batch Synchronization**
+   - Use Redis `INCR` on each click (atomic, fast)
+   - Background worker periodically synchronizes to the DB
+   - Distributes DB load while ensuring accuracy
 
-**아키텍처:**
+**Architecture:**
 
 ```
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
@@ -464,88 +464,88 @@ func (r *URLRepository) IncrementClicks(ctx context.Context, shortURL string) er
                     └─────────────┘
 ```
 
-**성능 개선 결과 (Stress Test 1000 VUs):**
+**Performance Improvement Results (Stress Test 1000 VUs):**
 
-| 지표 | Redis 도입 전 | Redis 도입 후 | 개선율 |
-|------|-------------|--------------|--------|
-| 평균 응답시간 | 687.93ms | 44.71ms | **-93.5%** |
-| p(95) 응답시간 | 2.47s | 109.46ms | **-95.6%** |
-| 처리량 | ~1,187 req/s | ~6,504 req/s | **+448%** |
+| Metric | Before Redis | After Redis | Improvement |
+|--------|-------------|-------------|-------------|
+| Avg response time | 687.93ms | 44.71ms | **-93.5%** |
+| p(95) response time | 2.47s | 109.46ms | **-95.6%** |
+| Throughput | ~1,187 req/s | ~6,504 req/s | **+448%** |
 
-**주의사항:**
+**Caveats:**
 
-1. **Redis 연결 실패 시**: DB fallback으로 서비스 지속 (graceful degradation)
-2. **동기화 지연**: 클릭 수가 실시간이 아닌 배치로 DB에 반영됨
-3. **캐시 무효화**: URL 수정 시 캐시 삭제 필요
+1. **Redis connection failure**: Falls back to DB to maintain service (graceful degradation)
+2. **Synchronization delay**: Click counts are reflected in the DB via batch processing, not in real-time
+3. **Cache invalidation**: Cache must be cleared when a URL is modified
 
-**Redis 연결 확인:**
+**Redis Connection Verification:**
 
 ```bash
-# EKS Pod에서 Redis 연결 테스트
+# Test Redis connection from an EKS Pod
 kubectl run -it --rm redis-test --image=redis:7 -n tunelink -- \
   redis-cli -h tunelink-dev-redis.6d5ed3.0001.apn2.cache.amazonaws.com ping
 ```
 
-**상세 결과:** [test-result.md](./test-result.md)
+**Detailed Results:** [test-result.md](./test-result.md)
 
 ---
 
-### k6 부하테스트 Pod 스케줄링 실패 (Too many pods)
+### k6 Load Test Pod Scheduling Failure (Too many pods)
 
-**날짜:** 2026-01-25
+**Date:** 2026-01-25
 
-**증상:**
+**Symptoms:**
 
-- k6 TestRun 실행 시 starter Pod이 Pending 상태로 대기
-- `kubectl describe pod` 시 아래 에러:
+- Starter Pod remains in Pending state when running a k6 TestRun
+- The following error appears in `kubectl describe pod`:
 
 ```
 Warning  FailedScheduling  0/3 nodes are available: 3 Too many pods.
 preemption: 0/3 nodes are available: 3 No preemption victims found for incoming pod.
 ```
 
-**원인:**
+**Cause:**
 
-- AWS EKS에서 Pod 수는 **인스턴스 타입의 ENI(Elastic Network Interface) 제한**에 의해 결정
-- 작은 인스턴스 타입은 ENI당 할당 가능한 IP 수가 적음
-- Pod마다 IP가 필요하므로 최대 Pod 수가 제한됨
+- In AWS EKS, the number of Pods is determined by the **ENI (Elastic Network Interface) limit of the instance type**
+- Smaller instance types have fewer allocatable IPs per ENI
+- Since each Pod requires an IP, the maximum number of Pods is limited
 
-**인스턴스별 최대 Pod 수:**
-| 인스턴스 타입 | 최대 Pod 수 |
-|-------------|-----------|
+**Maximum Pods by Instance Type:**
+| Instance Type | Max Pods |
+|---------------|----------|
 | t3.micro | 4 |
 | t3.small | 11 |
 | t3.medium | 17 |
 | t3.large | 35 |
 | t3.xlarge | 58 |
 
-**현재 상태 확인:**
+**Check Current Status:**
 
 ```bash
-# 노드별 Pod 용량 확인
+# Check Pod capacity per node
 kubectl get nodes -o custom-columns="NAME:.metadata.name,CAPACITY:.status.capacity.pods,ALLOCATABLE:.status.allocatable.pods"
 
-# 전체 Pod 수 확인
+# Check total Pod count
 kubectl get pods -A --no-headers | wc -l
 ```
 
-**해결 방법:**
+**Solutions:**
 
-1. **인스턴스 타입 업그레이드** - t3.medium 이상으로 변경
-2. **노드 추가** - Auto Scaling Group의 desired capacity 증가
-3. **불필요한 Pod 정리** - 사용하지 않는 워크로드 제거
+1. **Upgrade instance type** - Change to t3.medium or larger
+2. **Add more nodes** - Increase the Auto Scaling Group's desired capacity
+3. **Clean up unnecessary Pods** - Remove unused workloads
 
-**k6 테스트 리소스 정리:**
+**k6 Test Resource Cleanup:**
 
 ```bash
-# TestRun 삭제 (관련 Pod 자동 정리)
+# Delete TestRun (related Pods are automatically cleaned up)
 kubectl delete testrun <testrun-name> -n tunelink
 
-# 확인
+# Verify
 kubectl get pods -n tunelink | grep k6
 ```
 
-**참고:**
+**Notes:**
 
-- AWS ENI 제한 계산: `(ENI 수 × ENI당 IP 수) - 1`
-- 공식 문서: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-eni.html
+- AWS ENI limit calculation: `(Number of ENIs x IPs per ENI) - 1`
+- Official documentation: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-eni.html

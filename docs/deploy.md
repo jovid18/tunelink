@@ -1,42 +1,42 @@
-# TuneLink 배포 가이드
+# TuneLink Deployment Guide
 
-> 이 문서는 AWS 계정만 있는 상태에서 EKS 배포까지의 전체 과정을 기록합니다.
-> 각 단계 완료 시 체크박스를 표시하세요.
-
----
-
-## 현재 진행 상황
-
-| Phase | 상태 | 설명 |
-|-------|------|------|
-| Phase 1: 로컬 개발 | ✅ 완료 | Docker로 로컬 실행 |
-| Phase 2: AWS 인프라 | ✅ 완료 | Terraform으로 인프라 구축 + HTTPS |
-| Phase 3: CI/CD | ✅ 완료 | GitHub Actions |
-
-**배포 URL:** https://hearttune.link
+> This document records the entire process from having only an AWS account to deploying on EKS.
+> Check the checkbox upon completion of each step.
 
 ---
 
-## Phase 2: AWS 인프라 프로비저닝
+## Current Progress
 
-### Step 1: AWS 초기 설정
+| Phase | Status | Description |
+|-------|--------|-------------|
+| Phase 1: Local Development | ✅ Complete | Running locally with Docker |
+| Phase 2: AWS Infrastructure | ✅ Complete | Infrastructure provisioning with Terraform + HTTPS |
+| Phase 3: CI/CD | ✅ Complete | GitHub Actions |
 
-#### 1.1 IAM 사용자 생성
+**Deployment URL:** https://hearttune.link
 
-- [x] AWS Console 로그인 (root 계정)
+---
+
+## Phase 2: AWS Infrastructure Provisioning
+
+### Step 1: AWS Initial Setup
+
+#### 1.1 Create IAM User
+
+- [x] Log in to AWS Console (root account)
 - [x] IAM > Users > Create User
-  - 사용자 이름: `tunelink-operator`
-  - AWS Management Console 액세스: 선택사항
-- [x] 권한 설정 (아래 중 선택)
+  - Username: `tunelink-operator`
+  - AWS Management Console access: Optional
+- [x] Set permissions (choose one of the following)
 
-**옵션 A: AdministratorAccess (학습용, 간편)**
+**Option A: AdministratorAccess (for learning, simple)**
 ```
-AdministratorAccess 정책 연결
+Attach AdministratorAccess policy
 ```
 
-**옵션 B: 최소 권한 (프로덕션 권장)**
+**Option B: Least Privilege (recommended for production)**
 ```
-필요한 정책들:
+Required policies:
 - AmazonVPCFullAccess
 - AmazonEC2FullAccess
 - AmazonEKSClusterPolicy
@@ -44,58 +44,58 @@ AdministratorAccess 정책 연결
 - AmazonRDSFullAccess
 - AmazonElastiCacheFullAccess
 - AmazonEC2ContainerRegistryFullAccess
-- AmazonS3FullAccess (Terraform state용)
-- AmazonDynamoDBFullAccess (Terraform lock용)
-- IAMFullAccess (EKS IRSA용)
+- AmazonS3FullAccess (for Terraform state)
+- AmazonDynamoDBFullAccess (for Terraform lock)
+- IAMFullAccess (for EKS IRSA)
 ```
 
-#### 1.2 Access Key 생성
+#### 1.2 Create Access Key
 
 - [x] IAM > Users > tunelink-operator > Security credentials
-- [x] Create access key > CLI 선택
-- [x] Access Key ID와 Secret Access Key 저장 (한 번만 보임!)
+- [x] Create access key > Select CLI
+- [x] Save Access Key ID and Secret Access Key (shown only once!)
 
 ```
 Access Key ID: AKIA...
 Secret Access Key: xxxxxxxxxxxxxxxx
 ```
 
-#### 1.3 AWS CLI 설치
+#### 1.3 Install AWS CLI
 
 **macOS:**
 ```bash
 brew install awscli
 ```
 
-**설치 확인:**
+**Verify installation:**
 ```bash
 aws --version
 # aws-cli/2.x.x ...
 ```
 
-#### 1.4 AWS CLI 프로파일 설정
+#### 1.4 Configure AWS CLI Profile
 
-- [x] 아래 명령어 실행
+- [x] Run the following command
 
 ```bash
 aws configure --profile tunelink
 ```
 
-입력값:
+Input values:
 ```
-AWS Access Key ID: [위에서 저장한 Access Key ID]
-AWS Secret Access Key: [위에서 저장한 Secret Access Key]
+AWS Access Key ID: [Access Key ID saved above]
+AWS Secret Access Key: [Secret Access Key saved above]
 Default region name: ap-northeast-2
 Default output format: json
 ```
 
-- [x] 설정 확인
+- [x] Verify configuration
 
 ```bash
 aws sts get-caller-identity --profile tunelink
 ```
 
-예상 출력:
+Expected output:
 ```json
 {
     "UserId": "AIDA...",
@@ -104,12 +104,12 @@ aws sts get-caller-identity --profile tunelink
 }
 ```
 
-#### 1.5 환경변수 설정 (선택)
+#### 1.5 Set Environment Variables (Optional)
 
-매번 `--profile tunelink` 안 붙이려면:
+To avoid appending `--profile tunelink` every time:
 
 ```bash
-# ~/.zshrc 또는 ~/.bashrc에 추가
+# Add to ~/.zshrc or ~/.bashrc
 export AWS_PROFILE=tunelink
 export AWS_REGION=ap-northeast-2
 ```
@@ -120,34 +120,34 @@ source ~/.zshrc
 
 ---
 
-### Step 2: Terraform 설치 및 백엔드 설정
+### Step 2: Install Terraform and Configure Backend
 
-#### 2.1 Terraform 설치
+#### 2.1 Install Terraform
 
 **macOS:**
 ```bash
 brew install terraform
 ```
 
-**설치 확인:**
+**Verify installation:**
 ```bash
 terraform --version
 # Terraform v1.x.x
 ```
 
-#### 2.2 Terraform State용 S3 버킷 생성
+#### 2.2 Create S3 Bucket for Terraform State
 
-> Terraform은 인프라 상태를 파일로 저장함. 여러 명이 작업하거나 CI/CD에서 쓰려면 S3에 저장해야 함.
+> Terraform saves infrastructure state as a file. To work with multiple people or use it in CI/CD, it must be stored in S3.
 
-- [x] S3 버킷 생성
+- [x] Create S3 bucket
 
 ```bash
-# 버킷 이름은 전 세계적으로 유일해야 함
-# 본인 계정 ID나 랜덤 문자열 추가 권장
+# Bucket name must be globally unique
+# Adding your account ID or random string is recommended
 aws s3 mb s3://tunelink-terraform-state-058264445568 --region ap-northeast-2
 ```
 
-- [x] 버킷 버전 관리 활성화 (실수로 state 날려도 복구 가능)
+- [x] Enable bucket versioning (allows recovery if state is accidentally deleted)
 
 ```bash
 aws s3api put-bucket-versioning \
@@ -155,11 +155,11 @@ aws s3api put-bucket-versioning \
   --versioning-configuration Status=Enabled
 ```
 
-#### 2.3 Terraform Lock용 DynamoDB 테이블 생성
+#### 2.3 Create DynamoDB Table for Terraform Lock
 
-> 동시에 terraform apply 실행 방지 (Lock)
+> Prevents simultaneous terraform apply executions (Lock)
 
-- [x] DynamoDB 테이블 생성
+- [x] Create DynamoDB table
 
 ```bash
 aws dynamodb create-table \
@@ -170,35 +170,35 @@ aws dynamodb create-table \
   --region ap-northeast-2
 ```
 
-#### 2.4 백엔드 설정 확인
+#### 2.4 Verify Backend Configuration
 
-생성 확인:
+Verify creation:
 ```bash
-# S3 버킷 확인
+# Check S3 bucket
 aws s3 ls | grep tunelink
 
-# DynamoDB 테이블 확인
+# Check DynamoDB table
 aws dynamodb list-tables --region ap-northeast-2
 ```
 
 ---
 
-### Step 3: Terraform 프로젝트 구조 생성
+### Step 3: Create Terraform Project Structure
 
-#### 3.1 디렉토리 구조 생성
+#### 3.1 Create Directory Structure
 
-- [x] 아래 구조로 폴더 생성
+- [x] Create folders with the following structure
 
 ```
 infra/
 └── terraform/
     ├── envs/
     │   └── dev/
-    │       ├── main.tf          # 모듈 호출
-    │       ├── variables.tf     # 변수 정의
-    │       ├── outputs.tf       # 출력값
-    │       ├── terraform.tfvars # 변수 값 (git에 올리지 않음)
-    │       ├── backend.tf       # S3 백엔드 설정
+    │       ├── main.tf          # Module invocations
+    │       ├── variables.tf     # Variable definitions
+    │       ├── outputs.tf       # Output values
+    │       ├── terraform.tfvars # Variable values (do not commit to git)
+    │       ├── backend.tf       # S3 backend configuration
     │       └── providers.tf     # AWS, Kubernetes provider
     │
     └── modules/
@@ -213,7 +213,7 @@ infra/
         └── k8s_web/
 ```
 
-생성 명령어:
+Creation command:
 ```bash
 cd /Users/joseonghyeon/tunelink
 
@@ -223,20 +223,20 @@ mkdir -p infra/terraform/modules/{vpc,ecr,rds,elasticache,eks,alb_controller,k8s
 
 ---
 
-### Step 4: Terraform 모듈 작성
+### Step 4: Write Terraform Modules
 
-> 각 모듈은 의존성 순서대로 작성 및 적용
+> Each module is written and applied in dependency order
 
-#### 의존성 그래프
+#### Dependency Graph
 ```
-VPC ─┬─→ ECR (독립)
-     ├─→ RDS (VPC 필요)
-     ├─→ ElastiCache (VPC 필요)
-     └─→ EKS (VPC 필요)
+VPC ─┬─→ ECR (independent)
+     ├─→ RDS (requires VPC)
+     ├─→ ElastiCache (requires VPC)
+     └─→ EKS (requires VPC)
               │
-              └─→ ALB Controller (EKS 필요)
+              └─→ ALB Controller (requires EKS)
                        │
-                       └─→ K8s Base (ALB Controller 필요)
+                       └─→ K8s Base (requires ALB Controller)
                                 │
                                 ├─→ K8s API
                                 └─→ K8s Web
@@ -244,17 +244,17 @@ VPC ─┬─→ ECR (독립)
 
 ---
 
-#### 4.1 VPC 모듈
+#### 4.1 VPC Module
 
-**목적:** VPC, Subnet, Internet Gateway, NAT Gateway, Route Table 생성
+**Purpose:** Create VPC, Subnet, Internet Gateway, NAT Gateway, Route Table
 
-- [x] `infra/terraform/modules/vpc/main.tf` 작성
-- [x] `infra/terraform/modules/vpc/variables.tf` 작성
-- [x] `infra/terraform/modules/vpc/outputs.tf` 작성
-- [x] dev 환경에서 VPC 모듈 호출 추가
-- [x] `terraform apply` 로 VPC 생성 확인
+- [x] Write `infra/terraform/modules/vpc/main.tf`
+- [x] Write `infra/terraform/modules/vpc/variables.tf`
+- [x] Write `infra/terraform/modules/vpc/outputs.tf`
+- [x] Add VPC module invocation in dev environment
+- [x] Verify VPC creation with `terraform apply`
 
-**VPC 구조:**
+**VPC Structure:**
 ```
 VPC (10.0.0.0/16)
 ├── Public Subnet 1 (10.0.1.0/24) - ap-northeast-2a
@@ -262,13 +262,13 @@ VPC (10.0.0.0/16)
 ├── Private Subnet 1 (10.0.11.0/24) - ap-northeast-2a
 ├── Private Subnet 2 (10.0.12.0/24) - ap-northeast-2c
 ├── Internet Gateway
-├── NAT Gateway (Public Subnet에 위치)
+├── NAT Gateway (located in Public Subnet)
 └── Route Tables
 ```
 
-**네트워크 아키텍처:**
+**Network Architecture:**
 ```
-                            인터넷
+                            Internet
                                │
                                ▼
                     ┌──────────────────┐
@@ -307,56 +307,56 @@ VPC (10.0.0.0/16)
         │  └─────────────────────────────────────┘ │
         └──────────────────────────────────────────┘
 
-라우팅:
+Routing:
 ┌─────────────────┬────────────────────────────────┐
 │  Public RT      │  0.0.0.0/0 → Internet Gateway  │
 ├─────────────────┼────────────────────────────────┤
 │  Private RT     │  0.0.0.0/0 → NAT Gateway       │
 └─────────────────┴────────────────────────────────┘
 
-트래픽 흐름:
-• 외부 → ALB → Public Subnet → EKS (Private)
-• EKS (Private) → NAT Gateway → 인터넷 (외부 API 호출 등)
+Traffic Flow:
+• External → ALB → Public Subnet → EKS (Private)
+• EKS (Private) → NAT Gateway → Internet (external API calls, etc.)
 ```
 
-**apply 후 확인:**
+**Verify after apply:**
 ```bash
-# VPC 확인
+# Check VPC
 aws ec2 describe-vpcs --filters "Name=tag:Name,Values=tunelink-*" --query 'Vpcs[*].[VpcId,Tags[?Key==`Name`].Value|[0]]' --output table
 
-# Subnet 확인
+# Check Subnets
 aws ec2 describe-subnets --filters "Name=tag:Name,Values=tunelink-*" --query 'Subnets[*].[SubnetId,AvailabilityZone,CidrBlock,Tags[?Key==`Name`].Value|[0]]' --output table
 ```
 
 ---
 
-#### 4.2 ECR 모듈
+#### 4.2 ECR Module
 
-**목적:** Docker 이미지 저장소 생성 (api, web)
+**Purpose:** Create Docker image repositories (api, web)
 
-- [x] `infra/terraform/modules/ecr/main.tf` 작성
-- [x] `infra/terraform/modules/ecr/variables.tf` 작성
-- [x] `infra/terraform/modules/ecr/outputs.tf` 작성
-- [x] dev 환경에서 ECR 모듈 호출 추가
-- [x] `terraform apply` 로 ECR 생성 확인
+- [x] Write `infra/terraform/modules/ecr/main.tf`
+- [x] Write `infra/terraform/modules/ecr/variables.tf`
+- [x] Write `infra/terraform/modules/ecr/outputs.tf`
+- [x] Add ECR module invocation in dev environment
+- [x] Verify ECR creation with `terraform apply`
 
-**apply 후 확인:**
+**Verify after apply:**
 ```bash
 aws ecr describe-repositories --query 'repositories[*].[repositoryName,repositoryUri]' --output table
 ```
 
-**이미지 푸시 테스트 (ECR 생성 후):**
+**Image push test (after ECR creation):**
 ```bash
-# ECR 로그인
+# ECR login
 aws ecr get-login-password --region ap-northeast-2 | docker login --username AWS --password-stdin {ACCOUNT_ID}.dkr.ecr.ap-northeast-2.amazonaws.com
 
-# API 이미지 빌드 & 푸시
+# Build & push API image
 cd /Users/joseonghyeon/tunelink/apps/api
 docker build -t tunelink-api .
 docker tag tunelink-api:latest {ACCOUNT_ID}.dkr.ecr.ap-northeast-2.amazonaws.com/tunelink-api:latest
 docker push {ACCOUNT_ID}.dkr.ecr.ap-northeast-2.amazonaws.com/tunelink-api:latest
 
-# Web 이미지 빌드 & 푸시
+# Build & push Web image
 cd /Users/joseonghyeon/tunelink/apps/web
 docker build -t tunelink-web .
 docker tag tunelink-web:latest {ACCOUNT_ID}.dkr.ecr.ap-northeast-2.amazonaws.com/tunelink-web:latest
@@ -365,48 +365,48 @@ docker push {ACCOUNT_ID}.dkr.ecr.ap-northeast-2.amazonaws.com/tunelink-web:lates
 
 ---
 
-#### 4.3 RDS 모듈 (MySQL)
+#### 4.3 RDS Module (MySQL)
 
-**목적:** MySQL 데이터베이스 생성
+**Purpose:** Create MySQL database
 
-- [x] `infra/terraform/modules/rds/main.tf` 작성
-- [x] `infra/terraform/modules/rds/variables.tf` 작성
-- [x] `infra/terraform/modules/rds/outputs.tf` 작성
-- [x] dev 환경에서 RDS 모듈 호출 추가
-- [x] `terraform apply` 로 RDS 생성 확인
+- [x] Write `infra/terraform/modules/rds/main.tf`
+- [x] Write `infra/terraform/modules/rds/variables.tf`
+- [x] Write `infra/terraform/modules/rds/outputs.tf`
+- [x] Add RDS module invocation in dev environment
+- [x] Verify RDS creation with `terraform apply`
 
-**RDS 설정:**
+**RDS Configuration:**
 ```
 Engine: MySQL 8.0
-Instance: db.t3.micro (프리티어 가능)
+Instance: db.t3.micro (Free Tier eligible)
 Storage: 20GB gp2
-Multi-AZ: No (dev 환경)
+Multi-AZ: No (dev environment)
 Subnet: Private Subnet
 ```
 
-**apply 후 확인:**
+**Verify after apply:**
 ```bash
 aws rds describe-db-instances --query 'DBInstances[*].[DBInstanceIdentifier,Endpoint.Address,DBInstanceStatus]' --output table
 ```
 
 ---
 
-#### 4.4 ElastiCache 모듈 (Redis) - ✅ 완료
+#### 4.4 ElastiCache Module (Redis) - ✅ Complete
 
-**목적:** Redis 캐시 생성
+**Purpose:** Create Redis cache
 
-> **2026-02-03: 구현 완료**
-> - URL 조회 캐싱으로 DB 부하 감소
-> - 클릭 수 증가를 Redis INCR로 처리 후 배치 동기화
-> - Stress Test에서 93.5% 응답시간 개선 확인
+> **2026-02-03: Implementation complete**
+> - Reduced DB load with URL lookup caching
+> - Click count increments handled via Redis INCR with batch synchronization
+> - 93.5% response time improvement confirmed in Stress Test
 
-- [x] `infra/terraform/modules/elasticache/main.tf` 작성
-- [x] `infra/terraform/modules/elasticache/variables.tf` 작성
-- [x] `infra/terraform/modules/elasticache/outputs.tf` 작성
-- [x] dev 환경에서 ElastiCache 모듈 호출 추가
-- [x] `terraform apply` 로 ElastiCache 생성 확인
+- [x] Write `infra/terraform/modules/elasticache/main.tf`
+- [x] Write `infra/terraform/modules/elasticache/variables.tf`
+- [x] Write `infra/terraform/modules/elasticache/outputs.tf`
+- [x] Add ElastiCache module invocation in dev environment
+- [x] Verify ElastiCache creation with `terraform apply`
 
-**ElastiCache 설정:**
+**ElastiCache Configuration:**
 ```
 Engine: Redis 7.x
 Node Type: cache.t3.micro
@@ -414,42 +414,42 @@ Num Nodes: 1
 Subnet: Private Subnet
 ```
 
-**apply 후 확인:**
+**Verify after apply:**
 ```bash
 aws elasticache describe-cache-clusters --query 'CacheClusters[*].[CacheClusterId,CacheNodeType,CacheClusterStatus]' --output table
 ```
 
 ---
 
-#### 4.4.1 Bastion Host 모듈
+#### 4.4.1 Bastion Host Module
 
-**목적:** Private RDS 접근용 SSH 터널링 서버
+**Purpose:** SSH tunneling server for accessing Private RDS
 
-- [x] `infra/terraform/modules/bastion/main.tf` 작성
-- [x] `infra/terraform/modules/bastion/variables.tf` 작성
-- [x] `infra/terraform/modules/bastion/outputs.tf` 작성
-- [x] EC2 Key Pair 생성 (`tunelink-bastion`)
-- [x] dev 환경에서 Bastion 모듈 호출 추가
-- [x] `terraform apply` 로 Bastion 생성 확인
+- [x] Write `infra/terraform/modules/bastion/main.tf`
+- [x] Write `infra/terraform/modules/bastion/variables.tf`
+- [x] Write `infra/terraform/modules/bastion/outputs.tf`
+- [x] Create EC2 Key Pair (`tunelink-bastion`)
+- [x] Add Bastion module invocation in dev environment
+- [x] Verify Bastion creation with `terraform apply`
 
-**Bastion 설정:**
+**Bastion Configuration:**
 ```
-Instance Type: t4g.micro (ARM, 프리티어)
+Instance Type: t4g.micro (ARM, Free Tier)
 AMI: Amazon Linux 2023
 Subnet: Public Subnet
 Key Pair: tunelink-bastion
 ```
 
-**접속 정보:**
+**Connection Information:**
 ```
 Host: 3.36.215.254
 User: ec2-user
 Key: ~/.ssh/tunelink-bastion.pem
 ```
 
-**DataGrip에서 RDS 접속 (SSH Tunnel):**
+**Connecting to RDS from DataGrip (SSH Tunnel):**
 ```
-[SSH/SSL 탭]
+[SSH/SSL Tab]
 ✅ Use SSH tunnel
 Host: 3.36.215.254
 Port: 22
@@ -457,82 +457,82 @@ User: ec2-user
 Auth type: Key pair
 Private key: ~/.ssh/tunelink-bastion.pem
 
-[General 탭]
+[General Tab]
 Host: tunelink-dev-mysql.cxm4yimyycnl.ap-northeast-2.rds.amazonaws.com
 Port: 3306
 User: tunelink_admin
-Password: (terraform.tfvars 참고)
+Password: (refer to terraform.tfvars)
 Database: tunelink
 ```
 
-**SSH 접속 테스트:**
+**SSH Connection Test:**
 ```bash
 ssh -i ~/.ssh/tunelink-bastion.pem ec2-user@3.36.215.254
 ```
 
 ---
 
-#### 4.5 EKS 모듈
+#### 4.5 EKS Module
 
-**목적:** Kubernetes 클러스터 생성
+**Purpose:** Create Kubernetes cluster
 
-- [x] `infra/terraform/modules/eks/main.tf` 작성
-- [x] `infra/terraform/modules/eks/variables.tf` 작성
-- [x] `infra/terraform/modules/eks/outputs.tf` 작성
-- [x] dev 환경에서 EKS 모듈 호출 추가
-- [x] `terraform apply` 로 EKS 생성 확인 (10-15분 소요)
+- [x] Write `infra/terraform/modules/eks/main.tf`
+- [x] Write `infra/terraform/modules/eks/variables.tf`
+- [x] Write `infra/terraform/modules/eks/outputs.tf`
+- [x] Add EKS module invocation in dev environment
+- [x] Verify EKS creation with `terraform apply` (takes 10-15 minutes)
 
-**EKS 설정:**
+**EKS Configuration:**
 ```
-Kubernetes Version: 1.29 (또는 최신)
+Kubernetes Version: 1.29 (or latest)
 Node Group:
-  - capacity_type: SPOT (On-Demand 대비 60-70% 저렴)
-  - Instance Types: [t3.small, t3.medium, t3a.small, t3a.medium]  # 여러 타입 지정 (가용성 높임)
+  - capacity_type: SPOT (60-70% cheaper compared to On-Demand)
+  - Instance Types: [t3.small, t3.medium, t3a.small, t3a.medium]  # Multiple types specified (increases availability)
   - Desired: 2
   - Min: 1
   - Max: 3
   - Subnet: Private Subnet
 ```
 
-**Spot Instance 주의사항:**
-- AWS가 용량 필요하면 2분 전 경고 후 회수 가능
-- 여러 인스턴스 타입 지정하면 회수 확률 낮아짐
-- Stateless 앱(API, Web)은 Spot에 적합
-- 필요시 Node Termination Handler 설치 고려
+**Spot Instance Notes:**
+- AWS can reclaim instances with 2-minute warning when capacity is needed
+- Specifying multiple instance types reduces reclamation probability
+- Stateless apps (API, Web) are well-suited for Spot
+- Consider installing Node Termination Handler if needed
 
-**apply 후 확인:**
+**Verify after apply:**
 ```bash
-# EKS 클러스터 확인
+# Check EKS cluster
 aws eks describe-cluster --name tunelink-dev --query 'cluster.[name,status,endpoint]' --output table
 
-# kubeconfig 업데이트
+# Update kubeconfig
 aws eks update-kubeconfig --name tunelink-dev --region ap-northeast-2
 
-# kubectl 연결 확인
+# Verify kubectl connection
 kubectl get nodes
 kubectl get ns
 ```
 
 ---
 
-#### 4.6 ALB Controller 모듈
+#### 4.6 ALB Controller Module
 
-**목적:** AWS Load Balancer Controller 설치 (Ingress용)
+**Purpose:** Install AWS Load Balancer Controller (for Ingress)
 
-> EKS에서 Ingress를 만들면 자동으로 ALB가 생성되도록 하는 컨트롤러
+> A controller that automatically creates ALBs when Ingress resources are created in EKS
 
-- [x] `infra/terraform/modules/alb_controller/main.tf` 작성 (IRSA + Helm 또는 kubectl)
-- [x] `infra/terraform/modules/alb_controller/variables.tf` 작성
-- [x] `infra/terraform/modules/alb_controller/outputs.tf` 작성
-- [x] dev 환경에서 ALB Controller 모듈 호출 추가
-- [x] `terraform apply` 로 설치 확인
+- [x] Write `infra/terraform/modules/alb_controller/main.tf` (IRSA + Helm or kubectl)
+- [x] Write `infra/terraform/modules/alb_controller/variables.tf`
+- [x] Write `infra/terraform/modules/alb_controller/outputs.tf`
+- [x] Add ALB Controller module invocation in dev environment
+- [x] Verify installation with `terraform apply`
 
-**필요한 것:**
-1. IRSA (IAM Roles for Service Accounts) 설정
+**Requirements:**
+1. IRSA (IAM Roles for Service Accounts) configuration
 2. AWS Load Balancer Controller IAM Policy
 3. Controller Deployment
 
-**apply 후 확인:**
+**Verify after apply:**
 ```bash
 kubectl get deployment -n kube-system aws-load-balancer-controller
 kubectl get pods -n kube-system | grep aws-load-balancer
@@ -540,17 +540,17 @@ kubectl get pods -n kube-system | grep aws-load-balancer
 
 ---
 
-#### 4.7 K8s Base 모듈
+#### 4.7 K8s Base Module
 
-**목적:** Namespace, ConfigMap, Secret 생성
+**Purpose:** Create Namespace, ConfigMap, Secret
 
-- [x] `infra/terraform/modules/k8s_base/main.tf` 작성
-- [x] `infra/terraform/modules/k8s_base/variables.tf` 작성
-- [x] `infra/terraform/modules/k8s_base/outputs.tf` 작성
-- [x] dev 환경에서 K8s Base 모듈 호출 추가
-- [x] `terraform apply` 로 리소스 생성 확인
+- [x] Write `infra/terraform/modules/k8s_base/main.tf`
+- [x] Write `infra/terraform/modules/k8s_base/variables.tf`
+- [x] Write `infra/terraform/modules/k8s_base/outputs.tf`
+- [x] Add K8s Base module invocation in dev environment
+- [x] Verify resource creation with `terraform apply`
 
-**생성할 리소스:**
+**Resources to Create:**
 ```yaml
 # Namespace
 - name: tunelink
@@ -567,7 +567,7 @@ kubectl get pods -n kube-system | grep aws-load-balancer
 - DB_PASSWORD: (from terraform.tfvars)
 ```
 
-**apply 후 확인:**
+**Verify after apply:**
 ```bash
 kubectl get ns tunelink
 kubectl get configmap -n tunelink
@@ -576,17 +576,17 @@ kubectl get secret -n tunelink
 
 ---
 
-#### 4.8 K8s API 모듈
+#### 4.8 K8s API Module
 
-**목적:** API Deployment, Service 생성
+**Purpose:** Create API Deployment, Service
 
-- [x] `infra/terraform/modules/k8s_api/main.tf` 작성
-- [x] `infra/terraform/modules/k8s_api/variables.tf` 작성
-- [x] `infra/terraform/modules/k8s_api/outputs.tf` 작성
-- [x] dev 환경에서 K8s API 모듈 호출 추가
-- [x] `terraform apply` 로 배포 확인
+- [x] Write `infra/terraform/modules/k8s_api/main.tf`
+- [x] Write `infra/terraform/modules/k8s_api/variables.tf`
+- [x] Write `infra/terraform/modules/k8s_api/outputs.tf`
+- [x] Add K8s API module invocation in dev environment
+- [x] Verify deployment with `terraform apply`
 
-**생성할 리소스:**
+**Resources to Create:**
 ```yaml
 # Deployment
 - image: {ECR_URI}/tunelink-api:{TAG}
@@ -604,7 +604,7 @@ kubectl get secret -n tunelink
 - port: 80 -> 8080
 ```
 
-**apply 후 확인:**
+**Verify after apply:**
 ```bash
 kubectl get deployment -n tunelink
 kubectl get pods -n tunelink
@@ -614,17 +614,17 @@ kubectl logs -n tunelink -l app=api
 
 ---
 
-#### 4.9 K8s Web 모듈
+#### 4.9 K8s Web Module
 
-**목적:** Web Deployment, Service, Ingress 생성
+**Purpose:** Create Web Deployment, Service, Ingress
 
-- [x] `infra/terraform/modules/k8s_web/main.tf` 작성
-- [x] `infra/terraform/modules/k8s_web/variables.tf` 작성
-- [x] `infra/terraform/modules/k8s_web/outputs.tf` 작성
-- [x] dev 환경에서 K8s Web 모듈 호출 추가
-- [x] `terraform apply` 로 배포 확인
+- [x] Write `infra/terraform/modules/k8s_web/main.tf`
+- [x] Write `infra/terraform/modules/k8s_web/variables.tf`
+- [x] Write `infra/terraform/modules/k8s_web/outputs.tf`
+- [x] Add K8s Web module invocation in dev environment
+- [x] Verify deployment with `terraform apply`
 
-**생성할 리소스:**
+**Resources to Create:**
 ```yaml
 # Deployment
 - image: {ECR_URI}/tunelink-web:{TAG}
@@ -645,93 +645,93 @@ kubectl logs -n tunelink -l app=api
     - path: /* -> web service
 ```
 
-**apply 후 확인:**
+**Verify after apply:**
 ```bash
 kubectl get ingress -n tunelink
 kubectl describe ingress -n tunelink main-ingress
 
-# ALB DNS 확인 (배포 완료까지 2-3분)
+# Check ALB DNS (2-3 minutes until deployment completes)
 kubectl get ingress -n tunelink -o jsonpath='{.items[0].status.loadBalancer.ingress[0].hostname}'
 ```
 
 ---
 
-#### 4.10 도메인 및 HTTPS 설정
+#### 4.10 Domain and HTTPS Setup
 
-**목적:** 커스텀 도메인 연결 및 SSL 인증서 적용
+**Purpose:** Connect custom domain and apply SSL certificate
 
-- [x] Route 53에서 도메인 구매/등록
-  - 도메인: `hearttune.link`
-- [x] ACM 인증서 발급 (DNS 검증)
+- [x] Purchase/register domain in Route 53
+  - Domain: `hearttune.link`
+- [x] Issue ACM certificate (DNS validation)
   - ARN: `arn:aws:acm:ap-northeast-2:058264445568:certificate/d2dd8141-7efd-4aed-bd94-c39402abd721`
-  - 도메인: `hearttune.link`, `*.hearttune.link`
-- [x] Terraform Ingress에 HTTPS 설정 추가
-  - `k8s_web/main.tf` - annotations 수정
-  - `k8s_web/variables.tf` - certificate_arn 변수 추가
-  - `envs/dev/variables.tf` - 인증서 ARN, 도메인 설정
-  - `envs/dev/main.tf` - certificate_arn 전달
-- [x] Route 53 DNS 레코드 설정
+  - Domains: `hearttune.link`, `*.hearttune.link`
+- [x] Add HTTPS configuration to Terraform Ingress
+  - `k8s_web/main.tf` - Modify annotations
+  - `k8s_web/variables.tf` - Add certificate_arn variable
+  - `envs/dev/variables.tf` - Certificate ARN, domain configuration
+  - `envs/dev/main.tf` - Pass certificate_arn
+- [x] Configure Route 53 DNS records
   - `hearttune.link` → ALB (A Record Alias)
   - `www.hearttune.link` → ALB (A Record Alias)
-- [x] `terraform apply` 로 HTTPS 적용 확인
+- [x] Verify HTTPS with `terraform apply`
 
-**설정 구조:**
+**Configuration Structure:**
 ```
-사용자 → https://hearttune.link
+User → https://hearttune.link
               │
               ▼
          Route 53 (A Record Alias)
               │
               ▼
-         ALB (443 + ACM 인증서)
-         ├── HTTP 80 → HTTPS 443 리다이렉트
+         ALB (443 + ACM Certificate)
+         ├── HTTP 80 → HTTPS 443 Redirect
          └── HTTPS 443 → EKS Pods
 ```
 
-**IAM 인라인 정책 (추가됨):**
+**IAM Inline Policies (added):**
 ```
-tunelink-operator 사용자:
-- ACMFullAccess (인라인)
-- Route53FullAccess (인라인)
+tunelink-operator user:
+- ACMFullAccess (inline)
+- Route53FullAccess (inline)
 ```
 
-**apply 후 확인:**
+**Verify after apply:**
 ```bash
-# DNS 확인
+# Check DNS
 dig hearttune.link
 
-# HTTPS 접속 테스트
+# Test HTTPS connection
 curl -I https://hearttune.link
 
-# 인증서 확인
+# Check certificate
 echo | openssl s_client -servername hearttune.link -connect hearttune.link:443 2>/dev/null | openssl x509 -noout -dates
 ```
 
 ---
 
-#### 4.11 k6-operator 모듈 (부하테스트)
+#### 4.11 k6-operator Module (Load Testing)
 
-**목적:** Kubernetes-native 부하테스트 환경 구축
+**Purpose:** Build Kubernetes-native load testing environment
 
-> **선정 이유** (`test.md` 참고)
-> - 업계 표준 부하테스트 도구
-> - Grafana 연동 최적화 (같은 회사 제품)
-> - K8s CRD로 테스트 정의 → GitOps 친화적
+> **Selection Rationale** (see `test.md`)
+> - Industry-standard load testing tool
+> - Optimized Grafana integration (same company product)
+> - Test definition via K8s CRD → GitOps friendly
 
-- [x] `infra/terraform/modules/k6_operator/main.tf` 작성
-- [x] `infra/terraform/modules/k6_operator/variables.tf` 작성
-- [x] `infra/terraform/modules/k6_operator/outputs.tf` 작성
-- [x] dev 환경에서 k6-operator 모듈 호출 추가
-- [x] `terraform apply` 로 설치 확인
+- [x] Write `infra/terraform/modules/k6_operator/main.tf`
+- [x] Write `infra/terraform/modules/k6_operator/variables.tf`
+- [x] Write `infra/terraform/modules/k6_operator/outputs.tf`
+- [x] Add k6-operator module invocation in dev environment
+- [x] Verify installation with `terraform apply`
 
-**k6-operator 설정:**
+**k6-operator Configuration:**
 ```
 Namespace: k6-operator-system
-CRD: TestRun (k6 테스트 실행 단위)
+CRD: TestRun (k6 test execution unit)
 Helm Chart: grafana/k6-operator
 ```
 
-**아키텍처:**
+**Architecture:**
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                    EKS Cluster                          │
@@ -745,26 +745,26 @@ Helm Chart: grafana/k6-operator
 │           ▼              │     │          │        │   │
 │  ┌─────────────────┐     │     │          │        │   │
 │  │   TestRun CRD   │─────┼─────┴──────────┘        │   │
-│  │  (k6 스크립트)  │     │   HTTP requests         │   │
+│  │  (k6 script)    │     │   HTTP requests         │   │
 │  └─────────────────┘     └─────────────────────────┘   │
 │           │                                             │
 │           ▼                                             │
 │  ┌─────────────────┐                                   │
-│  │   k6 Runner     │──────► Prometheus (메트릭 수집)   │
-│  │   Pods (1~N)    │──────► Grafana (대시보드)         │
+│  │   k6 Runner     │──────► Prometheus (metrics)       │
+│  │   Pods (1~N)    │──────► Grafana (dashboard)        │
 │  └─────────────────┘                                   │
 └─────────────────────────────────────────────────────────┘
 ```
 
-**apply 후 확인:**
+**Verify after apply:**
 ```bash
-# k6-operator 설치 확인
+# Verify k6-operator installation
 kubectl get deployment -n k6-operator-system
 
-# CRD 확인
+# Check CRD
 kubectl get crd | grep k6
 
-# 샘플 테스트 실행
+# Run sample test
 kubectl apply -f - <<EOF
 apiVersion: k6.io/v1alpha1
 kind: TestRun
@@ -779,12 +779,12 @@ spec:
       file: script.js
 EOF
 
-# 테스트 상태 확인
+# Check test status
 kubectl get testrun -n tunelink
 kubectl logs -n tunelink -l app=k6 -f
 ```
 
-**k6 테스트 스크립트 예시 (ConfigMap):**
+**k6 Test Script Example (ConfigMap):**
 ```javascript
 // script.js
 import http from 'k6/http';
@@ -803,7 +803,7 @@ export default function () {
   let res = http.get('http://api.tunelink.svc.cluster.local/health');
   check(res, { 'health ok': (r) => r.status === 200 });
 
-  // URL 단축 생성
+  // Create shortened URL
   res = http.post(
     'http://api.tunelink.svc.cluster.local/api/urls',
     JSON.stringify({ original_url: 'https://example.com/test' }),
@@ -815,31 +815,31 @@ export default function () {
 }
 ```
 
-**Grafana 연동 (기존 모니터링 스택 활용):**
-- k6는 Prometheus Remote Write 지원
-- 기존 `prometheus-grafana`에 k6 대시보드 추가 가능
+**Grafana Integration (leveraging existing monitoring stack):**
+- k6 supports Prometheus Remote Write
+- Can add k6 dashboard to existing `prometheus-grafana`
 - Dashboard ID: `2587` (k6 Load Testing Results)
 
 ---
 
-### Step 5: 전체 배포 테스트
+### Step 5: Full Deployment Test
 
-- [x] 커스텀 도메인 접속 확인: `https://hearttune.link`
-- [x] API health check 확인: `curl https://hearttune.link/health`
-- [x] URL 단축 기능 테스트
-- [x] 리다이렉트 기능 테스트
+- [x] Verify custom domain access: `https://hearttune.link`
+- [x] Verify API health check: `curl https://hearttune.link/health`
+- [x] Test URL shortening functionality
+- [x] Test redirect functionality
 
 ---
 
-## Phase 3: CI/CD 구축
+## Phase 3: CI/CD Setup
 
-### Step 6: GitHub Actions 설정
+### Step 6: GitHub Actions Configuration
 
-#### 6.1 GitHub Secrets 설정
+#### 6.1 GitHub Secrets Configuration
 
 - [x] GitHub repo > Settings > Secrets and variables > Actions
 
-추가한 Secrets:
+Added Secrets:
 ```
 AWS_ACCESS_KEY_ID: (IAM Access Key)
 AWS_SECRET_ACCESS_KEY: (IAM Secret Key)
@@ -847,85 +847,85 @@ AWS_REGION: ap-northeast-2
 AWS_ACCOUNT_ID: 058264445568
 ```
 
-#### 6.2 API 워크플로우
+#### 6.2 API Workflow
 
-- [x] `.github/workflows/api.yml` 작성
+- [x] Write `.github/workflows/api.yml`
 
-트리거: `apps/api/**` 변경 시 (main 브랜치)
+Trigger: When `apps/api/**` changes (main branch)
 ```
 test → build → ECR push → kubectl set image → rollout
 ```
 
-#### 6.3 Web 워크플로우
+#### 6.3 Web Workflow
 
-- [x] `.github/workflows/web.yml` 작성
+- [x] Write `.github/workflows/web.yml`
 
-트리거: `apps/web/**` 변경 시 (main 브랜치)
+Trigger: When `apps/web/**` changes (main branch)
 ```
 build → ECR push → kubectl set image → rollout
 ```
 
-#### 6.4 Infra 워크플로우
+#### 6.4 Infra Workflow
 
-- [x] `.github/workflows/infra.yml` 작성
+- [x] Write `.github/workflows/infra.yml`
 
-트리거: `infra/**` 변경 시
+Trigger: When `infra/**` changes
 ```
-PR: terraform plan → 코멘트
+PR: terraform plan → comment
 main push: terraform apply
 ```
 
 ---
 
-## 유용한 명령어 모음
+## Useful Command Reference
 
 ### Terraform
 ```bash
 cd /Users/joseonghyeon/tunelink/infra/terraform/envs/dev
 
-# 초기화
+# Initialize
 terraform init
 
-# 검증
+# Validate
 terraform validate
 
-# 플랜 (변경사항 미리보기)
+# Plan (preview changes)
 terraform plan
 
-# 적용
+# Apply
 terraform apply
 
-# 특정 모듈만 적용
+# Apply specific module only
 terraform apply -target=module.vpc
 
-# 삭제 (주의!)
+# Destroy (caution!)
 terraform destroy
 ```
 
 ### kubectl
 ```bash
-# 컨텍스트 확인
+# Check context
 kubectl config current-context
 
-# 전체 리소스 확인
+# Check all resources
 kubectl get all -n tunelink
 
-# 로그 확인
+# Check logs
 kubectl logs -n tunelink -l app=api -f
 
-# Pod 접속
+# Access Pod shell
 kubectl exec -it -n tunelink {POD_NAME} -- /bin/sh
 
-# 재시작
+# Restart
 kubectl rollout restart deployment/api -n tunelink
 ```
 
 ### AWS
 ```bash
-# 계정 확인
+# Check account
 aws sts get-caller-identity
 
-# ECR 로그인
+# ECR login
 aws ecr get-login-password --region ap-northeast-2 | docker login --username AWS --password-stdin {ACCOUNT_ID}.dkr.ecr.ap-northeast-2.amazonaws.com
 
 # EKS kubeconfig
@@ -934,29 +934,29 @@ aws eks update-kubeconfig --name tunelink-dev --region ap-northeast-2
 
 ---
 
-## 비용 관리
+## Cost Management
 
-### 예상 월 비용 (dev 환경, Spot Instance 사용)
-| 리소스 | 비용 |
-|--------|------|
+### Estimated Monthly Cost (dev environment, using Spot Instances)
+| Resource | Cost |
+|----------|------|
 | EKS Control Plane | ~$73 |
-| EC2 Nodes (t3.small x2, **Spot**) | ~$10 (On-Demand 대비 ~70% 절감) |
+| EC2 Nodes (t3.small x2, **Spot**) | ~$10 (~70% savings compared to On-Demand) |
 | RDS (db.t3.micro) | ~$15 |
 | ElastiCache (cache.t3.micro) | ~$12 |
 | ALB | ~$20 |
 | NAT Gateway | ~$32 |
-| **합계** | **~$162/월** |
+| **Total** | **~$162/month** |
 
-> Spot 가격은 변동됨. 실시간 확인: [EC2 Spot Pricing](https://aws.amazon.com/ec2/spot/pricing/)
+> Spot pricing fluctuates. Check real-time pricing: [EC2 Spot Pricing](https://aws.amazon.com/ec2/spot/pricing/)
 
-### 비용 절감 팁
-- [ ] 사용하지 않을 때 Node Group 0으로 스케일 다운
-- [ ] NAT Gateway 대신 NAT Instance 사용 고려
-- [ ] RDS/ElastiCache 중지 (dev용)
+### Cost Saving Tips
+- [ ] Scale down Node Group to 0 when not in use
+- [ ] Consider using NAT Instance instead of NAT Gateway
+- [ ] Stop RDS/ElastiCache (for dev)
 
-### 리소스 정리 (프로젝트 종료 시)
+### Resource Cleanup (when project ends)
 ```bash
-# 역순으로 삭제
+# Delete in reverse order
 terraform destroy -target=module.k8s_web
 terraform destroy -target=module.k8s_api
 terraform destroy -target=module.k8s_base
@@ -967,77 +967,76 @@ terraform destroy -target=module.rds
 terraform destroy -target=module.ecr
 terraform destroy -target=module.vpc
 
-# 또는 전체 삭제
+# Or destroy everything
 terraform destroy
 ```
 
 ---
 
-## 트러블슈팅
+## Troubleshooting
 
-### EKS 연결 안 될 때
+### When EKS Connection Fails
 ```bash
-# kubeconfig 재설정
+# Reconfigure kubeconfig
 aws eks update-kubeconfig --name tunelink-dev --region ap-northeast-2 --profile tunelink
 
-# IAM 권한 확인
+# Check IAM permissions
 aws sts get-caller-identity
 ```
 
-### Pod가 Pending 상태일 때
+### When Pod is in Pending State
 ```bash
 kubectl describe pod -n tunelink {POD_NAME}
-# Events 섹션 확인
+# Check the Events section
 ```
 
-### ALB가 생성 안 될 때
+### When ALB is Not Created
 ```bash
-# ALB Controller 로그 확인
+# Check ALB Controller logs
 kubectl logs -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller
 
-# Ingress 이벤트 확인
+# Check Ingress events
 kubectl describe ingress -n tunelink main-ingress
 ```
 
-### RDS 연결 안 될 때
+### When RDS Connection Fails
 ```bash
-# Security Group 확인 - EKS 노드에서 RDS로 3306 포트 열려있는지
-# Private Subnet에 있으므로 로컬에서 직접 연결 불가
-# EKS Pod에서 테스트:
+# Check Security Group - verify port 3306 is open from EKS nodes to RDS
+# Since it's in a Private Subnet, direct connection from local is not possible
+# Test from an EKS Pod:
 kubectl run -it --rm mysql-client --image=mysql:8 -n tunelink -- mysql -h {RDS_ENDPOINT} -u {USER} -p
 ```
 
 ---
 
-## 작업 기록
+## Work Log
 
-> 여기에 작업 내용을 날짜별로 기록하세요
+> Record work items here by date
 
 ### 2026-01-23
-- [x] IAM 사용자 생성 (tunelink-operator)
-- [x] Access Key 생성 및 AWS CLI 프로파일 설정
-- [x] Terraform 백엔드 설정 (S3 + DynamoDB)
-- [x] Terraform 프로젝트 구조 생성
-- [x] VPC 모듈 작성 및 apply 완료
+- [x] Created IAM user (tunelink-operator)
+- [x] Created Access Key and configured AWS CLI profile
+- [x] Set up Terraform backend (S3 + DynamoDB)
+- [x] Created Terraform project structure
+- [x] Wrote and applied VPC module
   - VPC: vpc-0ba7bda39fb6393a5
   - Public Subnets: 10.0.1.0/24, 10.0.2.0/24
   - Private Subnets: 10.0.11.0/24, 10.0.12.0/24
-  - NAT Gateway, Internet Gateway 생성
-- [x] ECR, RDS, EKS, ALB Controller 모듈 작성 및 apply 완료
-- [x] K8s Base, API, Web 모듈 작성 및 apply 완료
-- [x] 커스텀 도메인 및 HTTPS 설정
-  - 도메인 구매: hearttune.link (Route 53)
-  - ACM 인증서 발급: hearttune.link, *.hearttune.link
-  - IAM 인라인 정책 추가: ACMFullAccess, Route53FullAccess
-  - Terraform HTTPS 설정 (Ingress annotations)
+  - Created NAT Gateway, Internet Gateway
+- [x] Wrote and applied ECR, RDS, EKS, ALB Controller modules
+- [x] Wrote and applied K8s Base, API, Web modules
+- [x] Custom domain and HTTPS setup
+  - Domain purchase: hearttune.link (Route 53)
+  - ACM certificate issued: hearttune.link, *.hearttune.link
+  - Added IAM inline policies: ACMFullAccess, Route53FullAccess
+  - Terraform HTTPS configuration (Ingress annotations)
   - Route 53 A Record: hearttune.link → ALB
   - Route 53 A Record: www.hearttune.link → ALB
-- [x] GitHub Actions CI/CD 설정
-  - GitHub Secrets 설정 (AWS credentials)
-  - `.github/workflows/api.yml` - API 빌드/배포
-  - `.github/workflows/web.yml` - Web 빌드/배포
-  - ~~`.github/workflows/infra.yml`~~ - 삭제 (로컬에서 관리)
-- [x] Bastion Host 추가
-  - EC2 Key Pair 생성: tunelink-bastion
-  - Bastion EC2: 3.36.215.254 (Elastic IP - 고정)
-  - DataGrip SSH Tunnel로 RDS 접속 가능
+- [x] GitHub Actions CI/CD setup
+  - GitHub Secrets configured (AWS credentials)
+  - `.github/workflows/api.yml` - API build/deploy
+  - `.github/workflows/web.yml` - Web build/deploy
+- [x] Added Bastion Host
+  - EC2 Key Pair created: tunelink-bastion
+  - Bastion EC2: 3.36.215.254 (Elastic IP - static)
+  - RDS accessible via DataGrip SSH Tunnel

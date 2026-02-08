@@ -1,30 +1,30 @@
-# 부하테스트
+# Load Testing
 
-## 도구 선정: k6
+## Tool Selection: k6
 
-### 후보군 비교
+### Candidate Comparison
 
-| 도구    | 평가     | 비고                    |
-| ------- | -------- | ----------------------- |
-| k6      | ⭐⭐⭐⭐ | **선정**                |
-| Locust  | ⭐⭐⭐   | Python 기반, 웹 UI 제공 |
-| Vegeta  | ⭐⭐⭐   | Go 프로젝트와 스택 일치 |
-| Gatling | ⭐⭐     | Scala 러닝커브          |
-| JMeter  | ⭐       | 레거시, GUI 무거움      |
+| Tool    | Rating   | Notes                              |
+| ------- | -------- | ---------------------------------- |
+| k6      | ⭐⭐⭐⭐ | **Selected**                       |
+| Locust  | ⭐⭐⭐   | Python-based, provides Web UI      |
+| Vegeta  | ⭐⭐⭐   | Stack matches Go project           |
+| Gatling | ⭐⭐     | Scala learning curve               |
+| JMeter  | ⭐       | Legacy, heavy GUI                  |
 
-### k6 선정 근거
+### Rationale for Selecting k6
 
-1. **업계 표준** - 현재 가장 많이 사용되는 부하테스트 도구
-2. **Grafana 연동** - 프로젝트에 이미 Prometheus + Grafana 모니터링 구축됨, 같은 회사 제품이라 연동 최적화
-3. **JavaScript 스크립트** - 프론트엔드(React) 개발자도 쉽게 작성 가능
-4. **K8s 친화적** - k6-operator로 클러스터 내 분산 부하테스트 가능
-5. **현대적 설계** - CLI 기반, CI/CD 파이프라인 통합 용이
+1. **Industry Standard** - Currently the most widely used load testing tool
+2. **Grafana Integration** - Prometheus + Grafana monitoring already set up in the project; same company's product ensures optimal integration
+3. **JavaScript Scripts** - Frontend (React) developers can easily write test scripts
+4. **K8s Friendly** - Distributed load testing within the cluster via k6-operator
+5. **Modern Design** - CLI-based, easy CI/CD pipeline integration
 
-## 아키텍처
+## Architecture
 
 ```
                           ┌─────────────────┐
-                          │   인터넷        │
+                          │   Internet      │
                           │ hearttune.link  │
                           └────────┬────────┘
                                    │ HTTPS
@@ -37,7 +37,7 @@
 │                    └────────┬────────┘                           │
 │                             │                                    │
 │  ┌────────────────────────┐ │  ┌────────────────────────┐       │
-│  │   일반 노드 그룹        │ │  │  Loadtest 노드 그룹     │       │
+│  │   General Node Group   │ │  │  Loadtest Node Group    │       │
 │  │   (tunelink-dev-node)  │ │  │  (tunelink-dev-loadtest)│       │
 │  │                        │ │  │  taint: role=loadtest   │       │
 │  │  ┌─────┐  ┌─────┐     │ │  │                        │       │
@@ -48,11 +48,11 @@
 │  │     │                 │ │  │  └────────┬─────────┘  │       │
 │  └─────┼─────────────────┘ │  └───────────┼────────────┘       │
 │        │                   │              │                     │
-│        └───────────────────┘              │ 외부 경로           │
+│        └───────────────────┘              │ External path       │
 │                                           │ (hearttune.link)    │
 │                                           ▼                     │
 │  ┌─────────────────────────┐       ┌──────────────┐            │
-│  │  k6-operator-system     │       │   인터넷     │            │
+│  │  k6-operator-system     │       │   Internet   │            │
 │  │  ┌───────────────────┐  │       └──────────────┘            │
 │  │  │   k6-operator     │──┼─── watches TestRun CRD ──────────▶│
 │  │  └───────────────────┘  │                                    │
@@ -60,35 +60,35 @@
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-> **참고**: k6는 외부 URL(`https://hearttune.link`)을 통해 테스트하므로, 실제 사용자와 동일한 경로(Ingress/ALB → API)로 부하테스트가 진행됩니다.
+> **Note**: k6 tests through the external URL (`https://hearttune.link`), so the load test follows the same path as real users (Ingress/ALB → API).
 
-### 노드 격리
+### Node Isolation
 
-k6 Runner Pod는 **전용 loadtest 노드**에서 실행됩니다. 이를 통해:
-- API Pod와 리소스 경쟁 없음 → **정확한 성능 측정**
-- 테스트 시에만 노드 활성화 → **비용 절약**
+k6 Runner Pods run on **dedicated loadtest nodes**. This ensures:
+- No resource contention with API Pods → **Accurate performance measurement**
+- Nodes activated only during tests → **Cost savings**
 
-자세한 내용은 [loadtest-node.md](./loadtest-node.md) 참조.
+For details, see [loadtest-node.md](./loadtest-node.md).
 
-### 컴포넌트
+### Components
 
-| 컴포넌트                  | Namespace            | 생명주기                        |
-| ------------------------- | -------------------- | ------------------------------- |
-| k6-operator               | `k6-operator-system` | 항상 실행 (가벼움, ~64Mi)       |
-| k6-test-scripts ConfigMap | `tunelink`           | 항상 존재                       |
-| k6 Runner Pods            | `tunelink`           | 테스트 시작 → 완료 후 자동 삭제 |
+| Component                 | Namespace            | Lifecycle                                       |
+| ------------------------- | -------------------- | ----------------------------------------------- |
+| k6-operator               | `k6-operator-system` | Always running (lightweight, ~64Mi)             |
+| k6-test-scripts ConfigMap | `tunelink`           | Always present                                  |
+| k6 Runner Pods            | `tunelink`           | Created at test start → auto-deleted on completion |
 
 ---
 
-## 테스트 대상 API
+## Target APIs
 
-| Method | Path           | 설명          | Request Body               |
-| ------ | -------------- | ------------- | -------------------------- |
-| GET    | `/health`      | 헬스체크      | -                          |
-| POST   | `/api/urls`    | URL 단축 생성 | `{ "originalUrl": "..." }` |
-| GET    | `/r/:shortUrl` | 리다이렉트    | -                          |
+| Method | Path           | Description       | Request Body               |
+| ------ | -------------- | ----------------- | -------------------------- |
+| GET    | `/health`      | Health check      | -                          |
+| POST   | `/api/urls`    | Create short URL  | `{ "originalUrl": "..." }` |
+| GET    | `/r/:shortUrl` | Redirect          | -                          |
 
-**외부 서비스 주소:**
+**External Service URL:**
 
 ```
 https://hearttune.link
@@ -96,104 +96,104 @@ https://hearttune.link
 
 ---
 
-## 테스트 스크립트
+## Test Scripts
 
-경로: `infra/modules/k6_operator/scripts/`
+Path: `infra/modules/k6_operator/scripts/`
 
-### 공통 설계 원칙
+### Common Design Principles
 
-모든 테스트는 **per-vu-iterations** executor를 사용하여 정확한 요청 수를 보장합니다:
-- 각 VU가 정해진 횟수만큼 iteration 실행
-- 각 iteration에서 1개 URL 생성 + N번 redirect
-- 시간 기반이 아닌 **횟수 기반** 테스트로 결과 예측 가능
+All tests use the **per-vu-iterations** executor to guarantee an exact number of requests:
+- Each VU executes a fixed number of iterations
+- Each iteration creates 1 URL + N redirects
+- **Count-based** testing (not time-based) for predictable results
 
 ### smoke-test.js
 
-- **목적**: 기본 동작 확인
+- **Purpose**: Verify basic functionality
 - **Executor**: `per-vu-iterations`
-- **부하**: 5 VUs × 1 iteration = **5 URLs**
-- **시나리오**: Health → URL 생성 → 10번 redirect
-- **예상 결과**: 5 URLs, 각 10 clicks
-- **Threshold**: p(95) < 500ms, 에러율 < 1%
+- **Load**: 5 VUs × 1 iteration = **5 URLs**
+- **Scenario**: Health → URL creation → 10 redirects
+- **Expected Result**: 5 URLs, 10 clicks each
+- **Threshold**: p(95) < 500ms, error rate < 1%
 
 ### load-test.js
 
-- **목적**: 일반적인 부하 상황 테스트
+- **Purpose**: Test under normal load conditions
 - **Executor**: `per-vu-iterations`
-- **부하**: 100 VUs × 3 iterations = **300 URLs**
-- **시나리오**: Health → URL 생성 → 100번 redirect
-- **예상 결과**: 300 URLs, 각 100 clicks (총 30,000 redirect 요청)
-- **Threshold**: p(95) < 1000ms, 에러율 < 5%
+- **Load**: 100 VUs × 3 iterations = **300 URLs**
+- **Scenario**: Health → URL creation → 100 redirects
+- **Expected Result**: 300 URLs, 100 clicks each (30,000 total redirect requests)
+- **Threshold**: p(95) < 1000ms, error rate < 5%
 
 ### stress-test.js
 
-- **목적**: 고부하 안정성 테스트
+- **Purpose**: Test stability under high load
 - **Executor**: `per-vu-iterations`
-- **부하**: 1000 VUs × 3 iterations = **3,000 URLs**
-- **시나리오**: Health → URL 생성 → 100번 redirect
-- **예상 결과**: 3,000 URLs, 각 100 clicks (총 300,000 redirect 요청)
-- **Threshold**: 없음 (한계 측정 목적)
+- **Load**: 1000 VUs × 3 iterations = **3,000 URLs**
+- **Scenario**: Health → URL creation → 100 redirects
+- **Expected Result**: 3,000 URLs, 100 clicks each (300,000 total redirect requests)
+- **Threshold**: None (purpose is to measure limits)
 
 ### breakpoint-test.js
 
-- **목적**: 시스템 한계점(Breaking Point) 탐색
-- **Executor**: `ramping-arrival-rate` (RPS 기반)
-- **부하**: 10 → 500 RPS (점진 증가), 최대 1000 VUs
-- **시나리오**: Health → URL 생성 → 100번 redirect (반복)
-- **Threshold**: 에러율 < 15%, p(95) < 10초 (초과 시 자동 중단)
-- **특징**: 일정 RPS 유지하며 부하 증가, 한계점 도달 시 자동 중단
+- **Purpose**: Find the system's breaking point
+- **Executor**: `ramping-arrival-rate` (RPS-based)
+- **Load**: 10 → 500 RPS (gradual increase), max 1000 VUs
+- **Scenario**: Health → URL creation → 100 redirects (repeated)
+- **Threshold**: Error rate < 15%, p(95) < 10s (auto-abort if exceeded)
+- **Characteristics**: Maintains constant RPS while increasing load, auto-aborts upon reaching the breaking point
 
 ---
 
-## 테스트 실행 방법
+## How to Run Tests
 
-### Claude Code 스킬 사용 (권장)
+### Using Claude Code Skill (Recommended)
 
 ```bash
-# Claude Code에서 간편하게 실행
+# Run conveniently from Claude Code
 /k6-load-test
 ```
 
-스킬이 테스트 유형 선택 → 실행 → 결과 문서화 → 리소스 정리까지 자동으로 처리합니다.
+The skill automatically handles test type selection → execution → result documentation → resource cleanup.
 
 ---
 
-### 수동 실행
+### Manual Execution
 
-### 0. Loadtest 노드 활성화 (테스트 전 필수)
+### 0. Activate Loadtest Node (Required Before Testing)
 
 ```bash
-# infra/main.tf에서 loadtest_node_desired_size = 1 로 변경 후
+# Change loadtest_node_desired_size = 1 in infra/main.tf, then
 cd /Users/joseonghyeon/tunelink/infra
 terraform apply -target=module.eks
 
-# 노드 Ready 확인 (1-2분 소요)
+# Verify node is Ready (takes 1-2 minutes)
 kubectl get nodes -l role=loadtest
 ```
 
-### 1. k6-operator 설치 (최초 1회)
+### 1. Install k6-operator (One-Time Setup)
 
 ```bash
 cd /Users/joseonghyeon/tunelink/infra
 terraform apply
 ```
 
-### 2. 설치 확인
+### 2. Verify Installation
 
 ```bash
-# k6-operator 확인
+# Check k6-operator
 kubectl get deployment -n k6-operator-system
 
-# 테스트 스크립트 ConfigMap 확인
+# Check test scripts ConfigMap
 kubectl get configmap k6-test-scripts -n tunelink
 ```
 
-### 3. 테스트 실행
+### 3. Run Tests
 
-> **참고**: 모든 테스트는 loadtest 노드에서 실행됩니다 (nodeSelector + toleration 필수)
+> **Note**: All tests run on the loadtest node (nodeSelector + toleration required)
 
 ```bash
-# Smoke Test 실행
+# Run Smoke Test
 kubectl apply -f - <<EOF
 apiVersion: k6.io/v1alpha1
 kind: TestRun
@@ -220,7 +220,7 @@ spec:
         value: http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090/api/v1/write
 EOF
 
-# Load Test 실행
+# Run Load Test
 kubectl apply -f - <<EOF
 apiVersion: k6.io/v1alpha1
 kind: TestRun
@@ -247,7 +247,7 @@ spec:
         value: http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090/api/v1/write
 EOF
 
-# Stress Test 실행
+# Run Stress Test
 kubectl apply -f - <<EOF
 apiVersion: k6.io/v1alpha1
 kind: TestRun
@@ -274,7 +274,7 @@ spec:
         value: http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090/api/v1/write
 EOF
 
-# Breakpoint Test 실행 (시스템 한계점 탐색)
+# Run Breakpoint Test (Find System Breaking Point)
 kubectl apply -f - <<EOF
 apiVersion: k6.io/v1alpha1
 kind: TestRun
@@ -309,60 +309,60 @@ spec:
 EOF
 ```
 
-### 4. 테스트 모니터링
+### 4. Monitor Tests
 
 ```bash
-# 테스트 상태 확인
+# Check test status
 kubectl get testrun -n tunelink
 
-# 실시간 로그
+# Real-time logs
 kubectl logs -n tunelink -l app=k6 -f
 
-# Runner Pod 확인
+# Check Runner Pods
 kubectl get pods -n tunelink -l app=k6
 ```
 
-### 5. 테스트 정리
+### 5. Clean Up Tests
 
 ```bash
-# 완료된 테스트 목록 확인
+# List completed tests
 kubectl get testrun -n tunelink
 
-# 특정 테스트 삭제
-kubectl delete testrun <테스트명> -n tunelink
+# Delete a specific test
+kubectl delete testrun <test-name> -n tunelink
 
-# 모든 완료된 테스트 삭제
+# Delete all completed tests
 kubectl delete testrun --all -n tunelink
 ```
 
-### 6. Loadtest 노드 끄기 (테스트 완료 후)
+### 6. Deactivate Loadtest Node (After Testing)
 
 ```bash
-# infra/main.tf에서 loadtest_node_desired_size = 0 로 변경 후
+# Change loadtest_node_desired_size = 0 in infra/main.tf, then
 cd /Users/joseonghyeon/tunelink/infra
 terraform apply -target=module.eks
 ```
 
 ---
 
-## Grafana 연동
+## Grafana Integration
 
-k6는 Prometheus Remote Write를 지원하여 기존 모니터링 스택과 연동됨.
+k6 supports Prometheus Remote Write, enabling integration with the existing monitoring stack.
 
-### 아키텍처
+### Architecture
 ```
 k6 Runner Pod → Prometheus Remote Write → Prometheus → Grafana
 ```
 
-### 설정 (이미 적용됨)
+### Configuration (Already Applied)
 
-**1. Prometheus Remote Write Receiver 활성화**
+**1. Enable Prometheus Remote Write Receiver**
 ```hcl
-# monitoring 모듈 main.tf
+# monitoring module main.tf
 prometheus.prometheusSpec.enableRemoteWriteReceiver = true
 ```
 
-**2. k6 TestRun에서 Prometheus로 메트릭 전송**
+**2. Send Metrics from k6 TestRun to Prometheus**
 ```yaml
 # testruns/*.yaml
 spec:
@@ -373,42 +373,42 @@ spec:
         value: http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090/api/v1/write
 ```
 
-**3. Grafana k6 대시보드 자동 프로비저닝**
-- **방식**: ConfigMap으로 커스텀 대시보드 배포
-- **파일**: `infra/modules/monitoring/dashboards/k6-prometheus.json`
-- 원본(gnetId: 19665)의 버그 수정 버전 (HTTP request failures 쿼리 수정)
-- terraform apply 시 자동 설치됨
+**3. Auto-Provisioned Grafana k6 Dashboard**
+- **Method**: Deploy custom dashboard via ConfigMap
+- **File**: `infra/modules/monitoring/dashboards/k6-prometheus.json`
+- Bug-fixed version of the original (gnetId: 19665) (HTTP request failures query fixed)
+- Automatically installed on terraform apply
 
-### 대시보드 수정 시
+### Modifying the Dashboard
 ```bash
-# 1. Grafana UI에서 대시보드 수정
+# 1. Edit the dashboard in Grafana UI
 # 2. Share > Export > Save to file
 
-# 3. JSON 파일을 dashboards 폴더로 복사
+# 3. Copy JSON file to dashboards folder
 cp ~/Downloads/k6-prometheus-*.json \
    infra/modules/monitoring/dashboards/k6-prometheus.json
 
-# 4. Terraform 적용
+# 4. Apply with Terraform
 cd infra && terraform apply -target=module.monitoring
 ```
 
 ---
 
-## 진행 상황
+## Progress
 
-- [x] k6 도구 선정 및 근거 문서화
-- [x] k6-operator Terraform 모듈 작성
-- [x] API 엔드포인트별 테스트 스크립트 작성 (smoke, load, stress, breakpoint)
-- [x] k6-operator 배포 (terraform apply)
-- [x] Smoke Test 실행 및 결과 확인
-- [x] Breakpoint Test 실행 및 결과 확인
-- [x] Grafana 대시보드 연동 (커스텀 대시보드, ConfigMap 관리)
-- [x] 부하테스트 결과 문서화 ([test-result.md](./test-result.md))
-- [x] Loadtest 노드 격리 구현 ([loadtest-node.md](./loadtest-node.md))
-- [x] Stress Test 실행 (2026-02-03) - **100% 성공, 클릭 카운트 정확도 100%**
+- [x] k6 tool selection and rationale documentation
+- [x] k6-operator Terraform module creation
+- [x] Test scripts for each API endpoint (smoke, load, stress, breakpoint)
+- [x] k6-operator deployment (terraform apply)
+- [x] Smoke Test execution and result verification
+- [x] Breakpoint Test execution and result verification
+- [x] Grafana dashboard integration (custom dashboard, ConfigMap management)
+- [x] Load test result documentation ([test-result.md](./test-result.md))
+- [x] Loadtest node isolation implementation ([loadtest-node.md](./loadtest-node.md))
+- [x] Stress Test execution (2026-02-03) - **100% success, click count accuracy 100%**
 
-## 관련 문서
+## Related Documents
 
-- [테스트 결과](./test-result.md) - 실행된 테스트 결과 기록
-- [노드 격리 설정](./loadtest-node.md) - Loadtest 전용 노드 그룹 설정
-- [모니터링](./monitoring.md) - Prometheus + Grafana 설정
+- [Test Results](./test-result.md) - Recorded results of executed tests
+- [Node Isolation Setup](./loadtest-node.md) - Loadtest dedicated node group configuration
+- [Monitoring](./monitoring.md) - Prometheus + Grafana configuration
