@@ -1,0 +1,187 @@
+<mxfile host="65bd71144e">
+    <diagram name="Redis Cache Sequence" id="seq-redis-cache">
+        <mxGraphModel dx="1078" dy="609" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1000" pageHeight="940" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="title" value="Redis Cache + Click Synchronization" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;fontSize=16;fontStyle=1;fontFamily=Helvetica;fontColor=#232F3E;" parent="1" vertex="1">
+                    <mxGeometry x="30" y="10" width="500" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="p_client" value="Client" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f3e8ff;strokeColor=#7c3aed;fontStyle=1;fontFamily=Helvetica;fontSize=12;fontColor=#5b21b6;" parent="1" vertex="1">
+                    <mxGeometry x="80" y="50" width="100" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="p_api" value="API Server" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d1fae5;strokeColor=#059669;fontStyle=1;fontFamily=Helvetica;fontSize=12;fontColor=#065f46;" parent="1" vertex="1">
+                    <mxGeometry x="290" y="50" width="120" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="p_redis" value="Redis" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fee2e2;strokeColor=#dc2626;fontStyle=1;fontFamily=Helvetica;fontSize=12;fontColor=#991b1b;" parent="1" vertex="1">
+                    <mxGeometry x="520" y="50" width="100" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="p_mysql" value="MySQL (RDS)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fef3c7;strokeColor=#d97706;fontStyle=1;fontFamily=Helvetica;fontSize=12;fontColor=#92400e;" parent="1" vertex="1">
+                    <mxGeometry x="730" y="50" width="120" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="ll_client" style="endArrow=none;dashed=1;html=1;strokeColor=#888888;dashPattern=8 4;strokeWidth=2;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="130" y="90" as="sourcePoint"/>
+                        <mxPoint x="130" y="900" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="ll_api" style="endArrow=none;dashed=1;html=1;strokeColor=#888888;dashPattern=8 4;strokeWidth=2;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="350" y="90" as="sourcePoint"/>
+                        <mxPoint x="350" y="900" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="ll_redis" style="endArrow=none;dashed=1;html=1;strokeColor=#888888;dashPattern=8 4;strokeWidth=2;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="570" y="90" as="sourcePoint"/>
+                        <mxPoint x="570" y="900" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="ll_mysql" style="endArrow=none;dashed=1;html=1;strokeColor=#888888;dashPattern=8 4;strokeWidth=2;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="790" y="90" as="sourcePoint"/>
+                        <mxPoint x="790" y="900" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="msg_req" value="GET /r/{shortUrl}" style="html=1;strokeColor=#333333;strokeWidth=1.5;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=10;fontColor=#333333;labelBackgroundColor=#FFFFFF;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="130" y="130" as="sourcePoint"/>
+                        <mxPoint x="350" y="130" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="alt_frame" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#999999;strokeWidth=1.5;" parent="1" vertex="1">
+                    <mxGeometry x="70" y="158" width="750" height="435" as="geometry"/>
+                </mxCell>
+                <mxCell id="alt_tag" value="alt" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E0E0E0;strokeColor=#999999;fontFamily=Helvetica;fontSize=10;fontStyle=1;fontColor=#333333;align=center;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="70" y="158" width="34" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="guard_hit" value="[Cache Hit]" style="text;html=1;strokeColor=none;fillColor=none;fontFamily=Helvetica;fontSize=10;fontStyle=2;fontColor=#059669;align=left;" parent="1" vertex="1">
+                    <mxGeometry x="140" y="160" width="100" height="16" as="geometry"/>
+                </mxCell>
+                <mxCell id="h1" value="cache lookup" style="html=1;strokeColor=#333333;strokeWidth=1.5;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=10;fontColor=#333333;labelBackgroundColor=#FFFFFF;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="350" y="200" as="sourcePoint"/>
+                        <mxPoint x="570" y="200" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="h2" value="originalURL" style="html=1;strokeColor=#999999;strokeWidth=1;dashed=1;dashPattern=6 3;endArrow=open;endFill=0;fontFamily=Helvetica;fontSize=10;fontColor=#666666;labelBackgroundColor=#FFFFFF;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="570" y="230" as="sourcePoint"/>
+                        <mxPoint x="350" y="230" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="h3" value="INCR click:{shortUrl}" style="html=1;strokeColor=#333333;strokeWidth=1.5;endArrow=open;endFill=0;fontFamily=Helvetica;fontSize=10;fontColor=#333333;labelBackgroundColor=#FFFFFF;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="350" y="268" as="sourcePoint"/>
+                        <mxPoint x="570" y="268" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="h3_note" value="async (goroutine)" style="text;html=1;strokeColor=none;fillColor=none;fontFamily=Helvetica;fontSize=8;fontStyle=2;fontColor=#999999;align=left;" parent="1" vertex="1">
+                    <mxGeometry x="575" y="258" width="90" height="16" as="geometry"/>
+                </mxCell>
+                <mxCell id="h4" value="302 Redirect" style="html=1;strokeColor=#999999;strokeWidth=1;dashed=1;dashPattern=6 3;endArrow=open;endFill=0;fontFamily=Helvetica;fontSize=10;fontColor=#666666;labelBackgroundColor=#FFFFFF;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="350" y="300" as="sourcePoint"/>
+                        <mxPoint x="130" y="300" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="alt_divider" style="endArrow=none;dashed=1;html=1;strokeColor=#999999;dashPattern=8 4;strokeWidth=1;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="70" y="335" as="sourcePoint"/>
+                        <mxPoint x="820" y="335" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="guard_miss" value="[Cache Miss]" style="text;html=1;strokeColor=none;fillColor=none;fontFamily=Helvetica;fontSize=10;fontStyle=2;fontColor=#dc2626;align=left;" parent="1" vertex="1">
+                    <mxGeometry x="140" y="340" width="100" height="16" as="geometry"/>
+                </mxCell>
+                <mxCell id="m1" value="cache lookup" style="html=1;strokeColor=#333333;strokeWidth=1.5;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=10;fontColor=#333333;labelBackgroundColor=#FFFFFF;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="350" y="375" as="sourcePoint"/>
+                        <mxPoint x="570" y="375" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="m2" value="miss" style="html=1;strokeColor=#999999;strokeWidth=1;dashed=1;dashPattern=6 3;endArrow=open;endFill=0;fontFamily=Helvetica;fontSize=10;fontColor=#666666;labelBackgroundColor=#FFFFFF;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="570" y="403" as="sourcePoint"/>
+                        <mxPoint x="350" y="403" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="m3" value="FindByShortURL(shortUrl)" style="html=1;strokeColor=#333333;strokeWidth=1.5;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=10;fontColor=#333333;labelBackgroundColor=#FFFFFF;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="350" y="435" as="sourcePoint"/>
+                        <mxPoint x="790" y="435" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="m4" value="originalURL" style="html=1;strokeColor=#999999;strokeWidth=1;dashed=1;dashPattern=6 3;endArrow=open;endFill=0;fontFamily=Helvetica;fontSize=10;fontColor=#666666;labelBackgroundColor=#FFFFFF;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="790" y="463" as="sourcePoint"/>
+                        <mxPoint x="350" y="463" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="m5" value="SET url:{shortUrl} (TTL 24h)" style="html=1;strokeColor=#333333;strokeWidth=1.5;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=10;fontColor=#333333;labelBackgroundColor=#FFFFFF;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="350" y="498" as="sourcePoint"/>
+                        <mxPoint x="570" y="498" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="m6" value="INCR click:{shortUrl}" style="html=1;strokeColor=#333333;strokeWidth=1.5;endArrow=open;endFill=0;fontFamily=Helvetica;fontSize=10;fontColor=#333333;labelBackgroundColor=#FFFFFF;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="350" y="530" as="sourcePoint"/>
+                        <mxPoint x="570" y="530" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="m6_note" value="async (goroutine)" style="text;html=1;strokeColor=none;fillColor=none;fontFamily=Helvetica;fontSize=8;fontStyle=2;fontColor=#999999;align=left;" parent="1" vertex="1">
+                    <mxGeometry x="575" y="520" width="90" height="16" as="geometry"/>
+                </mxCell>
+                <mxCell id="m7" value="302 Redirect" style="html=1;strokeColor=#999999;strokeWidth=1;dashed=1;dashPattern=6 3;endArrow=open;endFill=0;fontFamily=Helvetica;fontSize=10;fontColor=#666666;labelBackgroundColor=#FFFFFF;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="350" y="560" as="sourcePoint"/>
+                        <mxPoint x="130" y="560" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="sync_label" value="Background: ClickSyncService" style="text;html=1;strokeColor=none;fillColor=none;fontFamily=Helvetica;fontSize=11;fontStyle=1;fontColor=#232F3E;align=left;" parent="1" vertex="1">
+                    <mxGeometry x="140" y="620" width="200" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="loop_frame" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#999999;strokeWidth=1.5;" parent="1" vertex="1">
+                    <mxGeometry x="280" y="650" width="530" height="220" as="geometry"/>
+                </mxCell>
+                <mxCell id="loop_tag" value="loop" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E0E0E0;strokeColor=#999999;fontFamily=Helvetica;fontSize=10;fontStyle=1;fontColor=#333333;align=center;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="280" y="650" width="38" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="loop_guard" value="[every 10 seconds]" style="text;html=1;strokeColor=none;fillColor=none;fontFamily=Helvetica;fontSize=10;fontStyle=2;fontColor=#333333;align=left;" parent="1" vertex="1">
+                    <mxGeometry x="325" y="652" width="120" height="16" as="geometry"/>
+                </mxCell>
+                <mxCell id="s1" value="SCAN click:*" style="html=1;strokeColor=#333333;strokeWidth=1.5;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=10;fontColor=#333333;labelBackgroundColor=#FFFFFF;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="350" y="695" as="sourcePoint"/>
+                        <mxPoint x="570" y="695" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="s2" value="click keys" style="html=1;strokeColor=#999999;strokeWidth=1;dashed=1;dashPattern=6 3;endArrow=open;endFill=0;fontFamily=Helvetica;fontSize=10;fontColor=#666666;labelBackgroundColor=#FFFFFF;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="570" y="723" as="sourcePoint"/>
+                        <mxPoint x="350" y="723" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="s3" value="GETDEL click:{shortUrl}" style="html=1;strokeColor=#333333;strokeWidth=1.5;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=10;fontColor=#333333;labelBackgroundColor=#FFFFFF;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="350" y="755" as="sourcePoint"/>
+                        <mxPoint x="570" y="755" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="s4" value="count" style="html=1;strokeColor=#999999;strokeWidth=1;dashed=1;dashPattern=6 3;endArrow=open;endFill=0;fontFamily=Helvetica;fontSize=10;fontColor=#666666;labelBackgroundColor=#FFFFFF;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="570" y="783" as="sourcePoint"/>
+                        <mxPoint x="350" y="783" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="s5" value="IncrementClicksBy(count)" style="html=1;strokeColor=#333333;strokeWidth=1.5;endArrow=block;endFill=1;fontFamily=Helvetica;fontSize=10;fontColor=#333333;labelBackgroundColor=#FFFFFF;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="350" y="820" as="sourcePoint"/>
+                        <mxPoint x="790" y="820" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

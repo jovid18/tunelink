@@ -6,6 +6,10 @@
 
 **Live Demo:** https://hearttune.link
 
+## Architecture
+
+![AWS Architecture](docs/images/tunelink-architecture.png)
+
 ---
 
 ## Highlights
@@ -42,34 +46,6 @@
 - GitHub Actions
 - Prometheus + Grafana
 - k6 (Load Testing)
-
----
-
-## Architecture
-
-![AWS Architecture](docs/images/aws-vpc-resource-map.png)
-
-```mermaid
-flowchart TD
-    Internet((Internet)):::external --> Route53["Route 53<br/>hearttune.link"]:::network
-    Route53 --> ALB["ALB (HTTPS)"]:::network
-
-    subgraph EKS["EKS Cluster"]
-        API["API (Go)"]:::service
-        Web["Web (React)"]:::service
-    end
-
-    ALB --> API
-    ALB --> Web
-    API --> MySQL[("MySQL (RDS)")]:::database
-    API --> Redis[("Redis (ElastiCache)")]:::cache
-
-    classDef external fill:#f3e8ff,stroke:#7c3aed,color:#5b21b6
-    classDef network fill:#e0e7ff,stroke:#4f46e5,color:#3730a3
-    classDef service fill:#d1fae5,stroke:#059669,color:#065f46
-    classDef database fill:#fef3c7,stroke:#d97706,color:#92400e
-    classDef cache fill:#fee2e2,stroke:#dc2626,color:#991b1b
-```
 
 ---
 
@@ -137,20 +113,7 @@ Configured a Bastion Host for secure access to RDS/Redis in Private Subnets.
 
 Introduced a Redis caching strategy to reduce DB load and improve response speed.
 
-```mermaid
-flowchart TD
-    Client[Client]:::external --> API[API Server]:::service
-    API -->|"① cache lookup"| Redis[(Redis)]:::cache
-    Redis -.->|"cache hit"| API
-    API -->|"② cache miss"| MySQL[("MySQL (RDS)")]:::database
-    API -->|"③ INCR clicks"| Redis
-    Redis -->|"④ batch sync"| MySQL
-
-    classDef external fill:#f3e8ff,stroke:#7c3aed,color:#5b21b6
-    classDef service fill:#d1fae5,stroke:#059669,color:#065f46
-    classDef database fill:#fef3c7,stroke:#d97706,color:#92400e
-    classDef cache fill:#fee2e2,stroke:#dc2626,color:#991b1b
-```
+![Redis Cache Sequence](docs/images/redis-cache-sequence.png)
 
 **Implementation Details:**
 - **URL Lookup Caching**: Cache-Aside pattern (TTL: 1h)
@@ -283,21 +246,25 @@ tunelink/
 
 ---
 
-## Cost (Dev Environment)
+## Cost
 
 ![AWS Cost](docs/images/aws-cost-explorer.png)
 
-| Resource | Monthly Cost |
-|----------|-------------|
-| EKS Control Plane | $73 |
-| EC2 Nodes (Spot) | $10 |
-| RDS (db.t3.micro) | $15 |
-| ElastiCache | $12 |
-| ALB | $20 |
-| NAT Gateway | $32 |
-| **Total** | **~$162/month** |
+Actual cost for ~2 weeks (2026.01.23 ~ 02.05):
 
-> **~70% cost savings** compared to On-Demand by using Spot Instances
+| Service | Cost |
+|---------|------|
+| EKS Control Plane | $50 |
+| EC2-Other (NAT Gateway, EBS) | $23 |
+| Domain Registration | $20 |
+| ALB (Load Balancer) | $13 |
+| EC2 Instances (Spot) | $13 |
+| VPC | $9 |
+| RDS (MySQL) | $9 |
+| Tax | $5 |
+| Route 53 | $2 |
+| ElastiCache (Redis) | $1 |
+| **Total** | **$144** |
 
 ---
 
