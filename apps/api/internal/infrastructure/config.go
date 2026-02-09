@@ -19,7 +19,8 @@ import (
 type Config struct {
 	DB           *gorm.DB
 	Redis        *redis.Client
-	RedisEnabled bool
+	RedisEnabled bool   // true if REDIS_HOST is set
+	RedisHealthy bool   // true if initial PING succeeded
 	BaseURL      string
 }
 
@@ -28,13 +29,14 @@ func Load() *Config {
 	_ = godotenv.Load()
 
 	db := connectDB()
-	rdb, redisEnabled := connectRedis()
+	rdb, redisEnabled, redisHealthy := connectRedis()
 	baseURL := mustGetEnv("BASE_URL")
 
 	return &Config{
 		DB:           db,
 		Redis:        rdb,
 		RedisEnabled: redisEnabled,
+		RedisHealthy: redisHealthy,
 		BaseURL:      baseURL,
 	}
 }
@@ -74,11 +76,11 @@ func connectDB() *gorm.DB {
 	return db
 }
 
-func connectRedis() (*redis.Client, bool) {
+func connectRedis() (*redis.Client, bool, bool) {
 	host := getEnv("REDIS_HOST", "")
 	if host == "" {
 		log.Println("REDIS_HOST not set, Redis disabled")
-		return nil, false
+		return nil, false, false
 	}
 
 	port := getEnv("REDIS_PORT", "6379")
@@ -91,12 +93,12 @@ func connectRedis() (*redis.Client, bool) {
 	defer cancel()
 
 	if err := rdb.Ping(ctx).Err(); err != nil {
-		log.Printf("Redis connection failed: %v, Redis disabled", err)
-		return nil, false
+		log.Printf("Redis ping failed: %v (will retry via ResilientCache)", err)
+		return rdb, true, false
 	}
 
 	log.Println("Connected to Redis")
-	return rdb, true
+	return rdb, true, true
 }
 
 func getEnv(key, defaultValue string) string {

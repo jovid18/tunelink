@@ -13,6 +13,7 @@ import (
 	httpAdapter "github.com/tunelink/api/internal/adapter/in/http"
 	noopAdapter "github.com/tunelink/api/internal/adapter/out/cache/noop"
 	redisAdapter "github.com/tunelink/api/internal/adapter/out/cache/redis"
+	resilientAdapter "github.com/tunelink/api/internal/adapter/out/cache/resilient"
 	mysqlAdapter "github.com/tunelink/api/internal/adapter/out/persistence/mysql"
 	"github.com/tunelink/api/internal/application/sync"
 	urlApp "github.com/tunelink/api/internal/application/url"
@@ -26,11 +27,13 @@ func main() {
 	// Initialize adapters (outbound)
 	urlRepo := mysqlAdapter.NewURLRepository(cfg.DB)
 
-	// Initialize cache (Redis or Noop fallback)
+	// Initialize cache & click sync
 	var urlCache urlDomain.Cache
+	var resilientCache *resilientAdapter.ResilientCache
+	var clickSync *sync.ClickSyncService
+
 	if cfg.RedisEnabled {
-		urlCache = redisAdapter.NewURLCache(cfg.Redis)
-		log.Println("Using Redis cache")
+		urlCache, resilientCache, clickSync = setupRedis(cfg, urlRepo)
 	} else {
 		urlCache = noopAdapter.NewURLCache()
 		log.Println("Redis disabled, using noop cache")
@@ -38,13 +41,6 @@ func main() {
 
 	// Initialize use cases (application)
 	urlUseCase := urlApp.NewURLUseCase(urlRepo, urlCache)
-
-	// Start click sync service (only if Redis is enabled)
-	var clickSync *sync.ClickSyncService
-	if cfg.RedisEnabled {
-		clickSync = sync.NewClickSyncService(urlRepo, urlCache, 10*time.Second)
-		clickSync.Start()
-	}
 
 	// Initialize handlers (inbound adapters)
 	urlHandler := httpAdapter.NewURLHandler(urlUseCase, cfg.BaseURL)
@@ -97,18 +93,43 @@ func main() {
 	<-quit
 	log.Println("Shutting down server...")
 
-	// Gracefully shutdown server (reject new connections, wait for in-flight requests)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	if err := srv.Shutdown(ctx); err != nil {
 		log.Fatal("Server forced to shutdown:", err)
 	}
-
-	// Final click sync after server shutdown (no more incoming requests)
+	if resilientCache != nil {
+		resilientCache.Stop()
+	}
 	if clickSync != nil {
 		clickSync.Stop()
 	}
 
 	log.Println("Server exited")
+}
+
+// setupRedis creates a ResilientCache + ClickSync with state change wiring.
+func setupRedis(cfg *infrastructure.Config, urlRepo urlDomain.Repository) (urlDomain.Cache, *resilientAdapter.ResilientCache, *sync.ClickSyncService) {
+	primary := redisAdapter.NewURLCache(cfg.Redis)
+	fallback := noopAdapter.NewURLCache()
+	rc := resilientAdapter.New(cfg.Redis, primary, fallback, cfg.RedisHealthy)
+	rc.Start()
+
+	cs := sync.NewClickSyncService(urlRepo, rc, 10*time.Second)
+	if !cfg.RedisHealthy {
+		cs.Pause()
+	}
+	cs.Start()
+
+	rc.OnStateChange(func(healthy bool) {
+		if healthy {
+			cs.Resume()
+		} else {
+			cs.Pause()
+		}
+	})
+
+	log.Println("Using ResilientCache (Redis with automatic failover)")
+	return rc, rc, cs
 }

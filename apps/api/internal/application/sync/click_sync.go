@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/tunelink/api/internal/domain/url"
@@ -16,6 +17,7 @@ type ClickSyncService struct {
 	interval time.Duration
 	stopCh   chan struct{}
 	wg       sync.WaitGroup
+	paused   atomic.Bool
 }
 
 // NewClickSyncService creates a new click sync service
@@ -39,6 +41,9 @@ func (s *ClickSyncService) Start() {
 		for {
 			select {
 			case <-ticker.C:
+				if s.paused.Load() {
+					continue
+				}
 				s.syncClicks()
 			case <-s.stopCh:
 				// Final sync before shutdown
@@ -48,6 +53,18 @@ func (s *ClickSyncService) Start() {
 		}
 	}()
 	log.Printf("Click sync service started (interval: %v)", s.interval)
+}
+
+// Pause makes the sync service skip ticks until Resume is called.
+func (s *ClickSyncService) Pause() {
+	s.paused.Store(true)
+	log.Println("Click sync service paused")
+}
+
+// Resume unpauses the sync service.
+func (s *ClickSyncService) Resume() {
+	s.paused.Store(false)
+	log.Println("Click sync service resumed")
 }
 
 // Stop gracefully stops the sync service
