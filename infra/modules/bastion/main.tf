@@ -52,7 +52,7 @@ resource "aws_instance" "bastion" {
   key_name                    = var.key_name
   subnet_id                   = var.public_subnet_id
   vpc_security_group_ids      = [aws_security_group.bastion.id]
-  associate_public_ip_address = true
+  associate_public_ip_address = false # EIP 사용으로 불필요
 
   root_block_device {
     volume_size = 30
@@ -93,4 +93,15 @@ resource "aws_security_group_rule" "rds_from_bastion" {
   source_security_group_id = aws_security_group.bastion.id
   security_group_id        = var.rds_security_group_id
   description              = "MySQL from Bastion"
+}
+
+# Allow Bastion to access ElastiCache Redis
+resource "aws_security_group_rule" "redis_from_bastion" {
+  type                     = "ingress"
+  from_port                = 6379
+  to_port                  = 6379
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.bastion.id
+  security_group_id        = var.elasticache_security_group_id
+  description              = "Redis from Bastion"
 }

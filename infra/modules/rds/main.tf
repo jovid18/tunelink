@@ -55,7 +55,7 @@ resource "aws_db_instance" "main" {
   # Storage
   allocated_storage     = var.allocated_storage
   max_allocated_storage = 100 # Auto scaling 최대값
-  storage_type          = "gp2"
+  storage_type          = "gp3"
   storage_encrypted     = true
 
   # Database

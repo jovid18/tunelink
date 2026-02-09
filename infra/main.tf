@@ -38,9 +38,10 @@ module "bastion" {
   vpc_id                = module.vpc.vpc_id
   public_subnet_id      = module.vpc.public_subnet_ids[0]
   key_name              = "tunelink-bastion"
-  rds_security_group_id = module.rds.security_group_id
+  rds_security_group_id         = module.rds.security_group_id
+  elasticache_security_group_id = module.elasticache.security_group_id
 
-  depends_on = [module.rds]
+  depends_on = [module.rds, module.elasticache]
 }
 
 # ElastiCache (Redis)

@@ -39,3 +39,8 @@ variable "rds_security_group_id" {
   description = "RDS security group ID to allow access from Bastion"
   type        = string
 }
+
+variable "elasticache_security_group_id" {
+  description = "ElastiCache security group ID to allow access from Bastion"
+  type        = string
+}
